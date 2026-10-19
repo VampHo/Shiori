@@ -43,13 +43,19 @@ jobs:
       - name: Install required Android packages
         run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
 
+      - name: Cache preview signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: shiori-preview-signing-v1
+
       - name: Run unit tests and build debug APK
         run: bash gradlew --no-daemon --stacktrace :app:testDebugUnitTest :app:assembleDebug
 
       - name: Upload test APK
         uses: actions/upload-artifact@v4
         with:
-          name: Shiori-baseline-debug
+          name: Shiori-novels-preview
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14

@@ -8,6 +8,8 @@
 		android:persistent="false"
 		android:title="LeakCanary" />
 
+	<androidx.preference.SwitchPreferenceCompat android:key="strict_notifications" android:persistent="false" android:title="@string/novels_diagnostic_notifications" />
+
 	<Preference
 		android:key="work_inspector"
 		android:persistent="false"

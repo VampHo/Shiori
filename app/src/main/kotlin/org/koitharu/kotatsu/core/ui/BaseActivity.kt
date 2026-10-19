@@ -117,7 +117,7 @@ abstract class BaseActivity<B : ViewBinding> :
 	}
 
 	override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-		if (BuildConfig.DEBUG) {
+		if (BuildConfig.DEBUG && intent.getBooleanExtra("enable_debug_key_shortcuts", false)) {
 			if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
 				ActivityCompat.recreate(this)
 				return true

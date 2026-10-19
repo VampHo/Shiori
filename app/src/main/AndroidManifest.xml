@@ -67,6 +67,8 @@
 		android:theme="@style/Theme.Kotatsu"
 		tools:ignore="UnusedAttribute">
 
+		<activity android:name=".novels.NovelsActivity" android:exported="false" />
+
 		<activity
 			android:name="org.koitharu.kotatsu.main.ui.MainActivity"
 			android:exported="true">

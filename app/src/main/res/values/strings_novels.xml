@@ -1,0 +1,23 @@
+<resources>
+    <string name="novels_title">Novels</string>
+    <string name="novels_search_hint">Novel title on Royal Road</string>
+    <string name="novels_search">Search</string>
+    <string name="novels_continue">Continue: %1$s</string>
+    <string name="novels_source_notice">Royal Road · English novels · Preview</string>
+    <string name="novels_search_prompt">Search for a novel to start reading. Your last chapter and reading position are saved on this device.</string>
+    <string name="novels_no_results">No novels found. Try another title. If the website requires verification, open it in your browser.</string>
+    <string name="novels_resume">Resume reading</string>
+    <string name="novels_chapter_count">%1$d chapters</string>
+    <string name="novels_previous_page">Previous 100 chapters</string>
+    <string name="novels_next_page">More chapters</string>
+    <string name="novels_open_website">Open Royal Road in browser</string>
+    <string name="novels_chapters">Chapter list</string>
+    <string name="novels_smaller">Smaller text</string>
+    <string name="novels_larger">Larger text</string>
+    <string name="novels_previous_chapter">Previous chapter</string>
+    <string name="novels_next_chapter">Next chapter</string>
+    <string name="novels_loading">Loading…</string>
+    <string name="novels_error">Unable to load: %1$s</string>
+    <string name="novels_retry">Try again</string>
+    <string name="novels_diagnostic_notifications">Show developer diagnostic notifications</string>
+</resources>

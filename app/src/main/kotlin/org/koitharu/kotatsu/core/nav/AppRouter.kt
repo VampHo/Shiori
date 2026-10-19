@@ -261,6 +261,8 @@ class AppRouter private constructor(
         startActivity(intent)
     }
 
+    fun openNovels() = startActivity(org.koitharu.kotatsu.novels.NovelsActivity::class.java)
+
     fun openSettings() = startActivity(SettingsActivity::class.java)
 
     fun openReaderSettings() {

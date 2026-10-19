@@ -24,6 +24,11 @@ class MainMenuProvider(
 	}
 
 	override fun onMenuItemSelected(menuItem: MenuItem): Boolean = when (menuItem.itemId) {
+		R.id.action_novels -> {
+			router.openNovels()
+			true
+		}
+
 		R.id.action_settings -> {
 			router.openSettings()
 			true

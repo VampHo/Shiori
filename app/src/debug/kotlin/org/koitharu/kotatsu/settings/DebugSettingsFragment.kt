@@ -19,6 +19,13 @@ class DebugSettingsFragment : BasePreferenceFragment(R.string.debug), Preference
 
 	override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
 		addPreferencesFromResource(R.xml.pref_debug)
+		findPreference<androidx.preference.SwitchPreferenceCompat>("strict_notifications")?.let { pref ->
+			pref.isChecked = application.isStrictNotificationsEnabled
+			pref.setOnPreferenceChangeListener { _, value ->
+				application.isStrictNotificationsEnabled = value as Boolean
+				true
+			}
+		}
 		findPreference<SplitSwitchPreference>(KEY_LEAK_CANARY)?.let { pref ->
 			pref.isChecked = application.isLeakCanaryEnabled
 			pref.onPreferenceChangeListener = this

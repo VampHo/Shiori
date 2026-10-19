@@ -11,8 +11,15 @@ import org.koitharu.kotatsu.core.BaseApp
 
 class KotatsuApp : BaseApp() {
 
+	var isStrictNotificationsEnabled: Boolean
+		get() = getDebugPreferences(this).getBoolean("strict_notifications", false)
+		set(value) {
+			getDebugPreferences(this).edit { putBoolean("strict_notifications", value) }
+			enableStrictMode()
+		}
+
 	var isLeakCanaryEnabled: Boolean
-		get() = getDebugPreferences(this).getBoolean(KEY_LEAK_CANARY, true)
+		get() = getDebugPreferences(this).getBoolean(KEY_LEAK_CANARY, false)
 		set(value) {
 			getDebugPreferences(this).edit { putBoolean(KEY_LEAK_CANARY, value) }
 			configureLeakCanary()
@@ -31,7 +38,7 @@ class KotatsuApp : BaseApp() {
 	}
 
 	private fun enableStrictMode() {
-		val notifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+		val notifier = if (isStrictNotificationsEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
 			StrictModeNotifier(this)
 		} else {
 			null
