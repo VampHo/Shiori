@@ -287,7 +287,7 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
         }
         label(getString(R.string.novels_chapter_count, book.chapters.size), 20f)
         book.chapters.drop(page * 100).take(100).forEachIndexed { index, chapter ->
-            val chapterRow = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonTextButtonStyle).apply {
+            val chapterRow = MaterialButton(this, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
                 text = chapter.title
                 isAllCaps = false
                 gravity = Gravity.START or Gravity.CENTER_VERTICAL
@@ -318,7 +318,7 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
             val sizes = LinearLayout(this@NovelsActivity)
             viewBinding.novelControls.addView(sizes)
             listOf(-2f to "A−", 2f to "A+").forEach { (delta, name) ->
-                sizes.addView(MaterialButton(this@NovelsActivity, null, com.google.android.material.R.attr.materialButtonTextButtonStyle).apply {
+                sizes.addView(MaterialButton(this@NovelsActivity, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
                     text = name
                     contentDescription = getString(if (delta < 0) R.string.novels_smaller else R.string.novels_larger)
                     setOnClickListener {
