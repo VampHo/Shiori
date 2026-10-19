@@ -2,11 +2,13 @@
 
 An Android manga and novel reader, continued from Kotatsu by VampHo.
 
-## Preview 9.5.0-a1
+## Preview 9.5.0-a2
 
 - Existing Kotatsu manga reader.
-- **Novels** in the main screen overflow menu: search Royal Road, open a novel,
+- Equal **Manga** and **Novels** top tabs: search Royal Road, open a novel,
   choose a chapter and read with adjustable text size.
+- Novel History, Favorites and Explore sections with Material cards and controls.
+- Android emulator regression tests cover chapter styles and novel navigation.
 - Last-read chapter and scroll position saved per novel, with a Continue button
   for the most recently read novel. Global incognito mode disables novel progress saving.
 - Developer notifications and heap dumps are off by default. Developers can enable
@@ -15,7 +17,7 @@ An Android manga and novel reader, continued from Kotatsu by VampHo.
 
 The novel integration is an early preview adapted from QuickNovel's Royal Road
 provider. It currently supports online English prose, not EPUB import, TTS,
-chapter downloads, reviews, images, or a full novel bookshelf. Browser verification
+chapter downloads, reviews, images, or cover artwork. Browser verification
 and source changes can prevent loading. Opening the website is a fallback, not a
 verification bypass or a guarantee that the in-app request will work afterward.
 Novel progress is local to this installation and is not included in manga backups.
@@ -29,7 +31,7 @@ migrated automatically. This is a debug-signed test app, not a production releas
 CI caches the preview signing key; loss of the cache can require reinstalling a
 future preview. Production signing and upgrades remain to be set up.
 
-Open the main screen overflow menu → **Novels**, search a title, open a chapter,
+Open the **Novels** top tab, search a title, open a chapter,
 scroll, return to the chapter list, and use Resume reading to verify progress.
 Live source access and device behavior require real-device testing in addition
 to the fixture tests in CI.

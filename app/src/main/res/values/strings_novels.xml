@@ -21,4 +21,13 @@
     <string name="novels_retry">Try again</string>
     <string name="novels_diagnostic_notifications">Show developer diagnostic notifications</string>
     <string name="novels_incognito_prompt">Incognito mode: novel reading progress will not be saved.</string>
+    <string name="shiori_manga">Manga</string>
+    <string name="novels_source_name">Royal Road · English</string>
+    <string name="novels_results">Search results</string>
+    <string name="novels_explore_hint">Find your next story. Search by title above.</string>
+    <string name="novels_empty_favorites">Your saved novels will appear here. Add a novel from its chapter page.</string>
+    <string name="novels_empty_history">The novels you read will appear here.</string>
+    <string name="novels_find_books">Find novels</string>
+    <string name="novels_add_favorite">Add to favorites</string>
+    <string name="novels_remove_favorite">Remove from favorites</string>
 </resources>

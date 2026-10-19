@@ -79,7 +79,7 @@ class RoyalRoadRepository {
                 Regex("(?:display\\s*:\\s*none|visibility\\s*:\\s*hidden)", RegexOption.IGNORE_CASE).containsMatchIn(it.attr("style"))
             }.forEach { it.remove() }
             document.select("style").forEach { style ->
-                Regex("([^{}]+)\\{([^{}]*)}").findAll(style.data()).forEach { rule ->
+                Regex("""([^{}]+)\{([^{}]*)\}""").findAll(style.data()).forEach { rule ->
                     if (Regex("(?:display\\s*:\\s*none|visibility\\s*:\\s*hidden)", RegexOption.IGNORE_CASE).containsMatchIn(rule.groupValues[2])) {
                         runCatching { chapter.select(rule.groupValues[1].trim()).remove() }
                     }
