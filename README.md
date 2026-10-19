@@ -2,7 +2,7 @@
 
 An Android manga and novel reader, continued from Kotatsu by VampHo.
 
-## Preview 0.1.0
+## Preview 9.5.0-a1
 
 - Existing Kotatsu manga reader.
 - **Novels** in the main screen overflow menu: search Royal Road, open a novel,
