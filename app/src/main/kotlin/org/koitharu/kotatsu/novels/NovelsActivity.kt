@@ -14,6 +14,8 @@ import androidx.core.text.HtmlCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
+import dagger.hilt.android.EntryPointAccessors
+import org.koitharu.kotatsu.core.ui.BaseActivityEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -24,6 +26,8 @@ import org.koitharu.kotatsu.databinding.ActivityNovelsBinding
 /** First integrated novel reader. Manga storage and navigation remain independent. */
 class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
     private val repository = RoyalRoadRepository()
+    private val isIncognito: Boolean
+        get() = EntryPointAccessors.fromApplication<BaseActivityEntryPoint>(applicationContext).settings.isIncognitoModeEnabled
     private val progress by lazy { getSharedPreferences("shiori_novels", MODE_PRIVATE) }
     private var task: Job? = null
     private var novel: NovelDetails? = null
@@ -110,13 +114,13 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
             true
         }
         val recent = progress.getString("recent_url", null)
-        if (recent != null) {
+        if (recent != null && !isIncognito) {
             button(getString(R.string.novels_continue, progress.getString("recent_title", ""))) {
                 openNovel(recent, progress.getString("chapter:$recent", null), progress.getInt("offset:$recent", 0))
             }
         }
         label(getString(R.string.novels_source_notice))
-        if (results.isEmpty()) label(getString(R.string.novels_search_prompt))
+        if (results.isEmpty()) label(getString(if (isIncognito) R.string.novels_incognito_prompt else R.string.novels_search_prompt))
         results.forEach { book -> button(book.title) { openNovel(book.url) } }
     }
 
@@ -147,7 +151,7 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
         chapterIndex = -1
         val lastUrl = progress.getString("chapter:${book.url}", null)
         val last = book.chapters.indexOfFirst { it.url == lastUrl }
-        if (last >= 0) button(getString(R.string.novels_resume)) {
+        if (last >= 0 && !isIncognito) button(getString(R.string.novels_resume)) {
             openChapter(last, progress.getInt("offset:${book.url}", 0))
         }
         label(book.synopsis)
@@ -221,6 +225,7 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
     }
 
     private fun savePosition() {
+        if (isIncognito) return
         val book = novel ?: return
         val chapter = book.chapters.getOrNull(chapterIndex) ?: return
         if (readingText == null) return
@@ -236,6 +241,10 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         savePosition()
+        if (isIncognito) {
+            super.onSaveInstanceState(outState)
+            return
+        }
         outState.putString("query", query)
         outState.putString("novel", novel?.url)
         outState.putString("chapter", novel?.chapters?.getOrNull(chapterIndex)?.url)
