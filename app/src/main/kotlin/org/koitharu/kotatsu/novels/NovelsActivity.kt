@@ -253,7 +253,7 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
     private fun empty(message: String, action: String? = null, click: () -> Unit = {}) {
         val icon = android.widget.ImageView(this).apply {
             setImageResource(R.drawable.ic_book_page); alpha = 0.5f
-            imageTintList = android.content.res.ColorStateList.valueOf(com.google.android.material.color.MaterialColors.getColor(viewBinding.root, com.google.android.material.R.attr.colorPrimary))
+            imageTintList = android.content.res.ColorStateList.valueOf(com.google.android.material.color.MaterialColors.getColor(viewBinding.root, androidx.appcompat.R.attr.colorPrimary))
         }
         viewBinding.novelContent.addView(icon, LinearLayout.LayoutParams(dp(64), dp(64)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(64); bottomMargin = dp(16) })
         label(message).apply { gravity = Gravity.CENTER; alpha = 0.8f }
