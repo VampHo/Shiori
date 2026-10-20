@@ -178,6 +178,33 @@ class NovelReaderAndroidTest {
         } finally { shelf.removeDownload(book.link()) }
     }
 
+    @Test fun recentChapterCacheDoesNotEvictDownloads() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val shelf = NovelShelf(context)
+        val book = NovelDetails("Download stays", "local:cache-test", "", listOf(NovelLink("Saved", "local:cache-test/saved")), source="local")
+        shelf.cacheDetails(book)
+        shelf.cacheChapter(book.chapters[0].url, "Permanent chapter")
+        try {
+            repeat(35) { shelf.cacheRecentChapter("https://example.org/chapter/$it", "Recent $it") }
+            assertEquals("Recent 34", NovelShelf(context).recentChapter("https://example.org/chapter/34"))
+            assertEquals("Permanent chapter", shelf.cachedChapter(book.chapters[0].url))
+            assertTrue(File(context.cacheDir, "novel_recent").listFiles()!!.count { it.extension == "html" } <= 30)
+        } finally {
+            shelf.removeDownload(book.link())
+            File(context.cacheDir, "novel_recent").deleteRecursively()
+        }
+    }
+
+    @Test fun personalCatalogueExcludesAdultBrokenAndUnselectedSources() {
+        val policy = org.koitharu.kotatsu.explore.data.PersonalSourcePolicy
+        val all = org.koitharu.kotatsu.parsers.model.MangaParserSource.entries
+        val allowed = all.filter(policy::allows)
+        assertTrue(allowed.isNotEmpty())
+        assertTrue(allowed.all { it.name in policy.sourceNames && !it.isBroken && it.contentType != org.koitharu.kotatsu.parsers.model.ContentType.HENTAI })
+        assertTrue(all.filter { it.contentType == org.koitharu.kotatsu.parsers.model.ContentType.HENTAI }.none(policy::allows))
+        assertEquals(policy.sourceNames, all.filter { it.name in policy.sourceNames }.map { it.name }.toSet())
+    }
+
     private fun screenshot(name: String) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.waitForIdleSync()

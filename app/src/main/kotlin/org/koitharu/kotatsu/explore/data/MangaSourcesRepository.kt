@@ -54,7 +54,7 @@ class MangaSourcesRepository @Inject constructor(
 
 	val allMangaSources: Set<MangaParserSource> = Collections.unmodifiableSet(
 		EnumSet.noneOf<MangaParserSource>(MangaParserSource::class.java).also {
-            MangaParserSource.entries.filterNotTo(it, MangaParserSource::isBroken)
+            MangaParserSource.entries.filterTo(it, PersonalSourcePolicy::allows)
         }
 	)
 
@@ -75,7 +75,7 @@ class MangaSourcesRepository @Inject constructor(
 		assimilateNewSources()
 		val skipNsfw = settings.isNsfwContentDisabled
 		return dao.findAllPinned().mapNotNullToSet {
-			it.source.toMangaSourceOrNull()?.takeUnless { x -> skipNsfw && x.isNsfw() }
+			it.source.toMangaSourceOrNull()?.takeIf { x -> x in allMangaSources && (!skipNsfw || !x.isNsfw()) }
 		}
 	}
 
@@ -150,7 +150,7 @@ class MangaSourcesRepository @Inject constructor(
 			},
 		) { skipNsfw, sources ->
 			sources.count {
-				it.source.toMangaSourceOrNull()?.let { s -> !skipNsfw || !s.isNsfw() } == true
+				it.source.toMangaSourceOrNull()?.let { s -> s in allMangaSources && (!skipNsfw || !s.isNsfw()) } == true
 			}
 		}.distinctUntilChanged().onStart { assimilateNewSources() }
 	}

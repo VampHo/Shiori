@@ -64,7 +64,9 @@ class ParserMangaRepository(
 
 	override suspend fun getList(offset: Int, order: SortOrder?, filter: MangaListFilter?): List<Manga> {
 		return withMirrors {
-			parser.getList(offset, order ?: defaultSortOrder, filter ?: MangaListFilter.EMPTY)
+			parser.getList(offset, order ?: defaultSortOrder,
+                (filter ?: MangaListFilter.EMPTY).copy(contentRating = setOf(org.koitharu.kotatsu.parsers.model.ContentRating.SAFE)))
+                .filter(PersonalContentPolicy::allows)
 		}
 	}
 
@@ -86,7 +88,7 @@ class ParserMangaRepository(
 		parser.getFavicons()
 	}
 
-	override suspend fun getRelatedMangaImpl(seed: Manga): List<Manga> = parser.getRelatedManga(seed)
+	override suspend fun getRelatedMangaImpl(seed: Manga): List<Manga> = parser.getRelatedManga(seed).filter(PersonalContentPolicy::allows)
 
 	override suspend fun getDetailsImpl(manga: Manga): Manga = withMirrors {
 		parser.getDetails(manga)

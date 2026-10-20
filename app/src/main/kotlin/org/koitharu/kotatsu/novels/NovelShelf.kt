@@ -59,6 +59,20 @@ class NovelShelf(private val context: Context) {
         remember(fixed)
         return fixed
     }
+    private val recentRoot = File(context.cacheDir, "novel_recent").apply { mkdirs() }
+    fun recentChapter(url: String): String? = runCatching {
+        val cached = File(recentRoot, hash(url) + ".html")
+        if (!cached.isFile) null else cached.readText().also { cached.setLastModified(System.currentTimeMillis()) }
+    }.getOrNull()
+    fun cacheRecentChapter(url: String, html: String) {
+        atomicWrite(File(recentRoot, hash(url) + ".html"), html)
+        val files = recentRoot.listFiles()?.filter { it.extension == "html" }?.sortedByDescending { it.lastModified() }.orEmpty()
+        var bytes = 0L
+        files.forEachIndexed { index, file ->
+            bytes += file.length()
+            if (index >= 30 || bytes > 16L * 1024 * 1024) file.delete()
+        }
+    }
     fun cachedChapter(url: String): String? = file(url, ".html").takeIf { it.isFile }?.readText()
     fun hasChapter(url: String) = file(url, ".html").isFile
     fun cacheChapter(url: String, html: String) { atomicWrite(file(url, ".html"), html) }

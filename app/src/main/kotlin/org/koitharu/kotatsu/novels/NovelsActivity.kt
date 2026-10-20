@@ -276,10 +276,12 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
 
     private fun repairCovers(books: List<NovelLink>) {
         if (coverRepairJob?.isActive == true) return
-        val pending = books.filter { it.url !in coverRepairAttempted && shelf.needsCoverRepair(it) }.take(12)
-        if (pending.isEmpty()) return
         val originalSection = section
         coverRepairJob = lifecycleScope.launch {
+            val pending = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                books.filter { it.url !in coverRepairAttempted && shelf.needsCoverRepair(it) }.take(12)
+            }
+            if (pending.isEmpty()) return@launch
             var changed = false
             for (book in pending) {
                 coverRepairAttempted.add(book.url)
@@ -440,17 +442,19 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
     }
 
     private fun openNovel(url: String, resumeChapter: String? = null, offset: Int = 0) {
+        coverRepairJob?.cancel()
         load({ openNovel(url, resumeChapter, offset) }) {
             novel = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 val cached = shelf.cachedDetails(url)
                 val hint = selectedBook?.takeIf { it.url == url }
                 val book = cached ?: repository.details(url)
                 val cover = when {
-                    hint != null && NovelCatalogRepository.validCover(hint.cover) && (section == R.id.novel_explore || !shelf.needsCoverRepair(hint)) -> hint.cover
-                    cached != null && shelf.needsCoverRepair(cached.link()) -> try { repository.bookCover(url) } catch (e: CancellationException) { throw e } catch (_: Exception) { "" }
+                    hint != null && NovelCatalogRepository.validCover(hint.cover) -> hint.cover
                     else -> book.cover
                 }
-                book.copy(cover = cover.ifBlank { if (NovelCatalogRepository.validCover(book.cover)) book.cover else "" }).also { shelf.cacheDetails(it) }
+                book.copy(cover = cover.ifBlank { if (NovelCatalogRepository.validCover(book.cover)) book.cover else "" }).also {
+                    if (cached == null || it.cover != cached.cover) shelf.cacheDetails(it)
+                }
             }
             shelf.remember(novel!!.link())
             chapterIndex = -1
@@ -518,7 +522,10 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
         chapterIndex = -1
         load({ openChapter(index, offset) }) {
             val html = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                shelf.cachedChapter(chapter.url) ?: repository.chapter(chapter.url)
+                shelf.cachedChapter(chapter.url) ?: (if (isIncognito) null else shelf.recentChapter(chapter.url))
+                    ?: repository.chapter(chapter.url).also { html ->
+                        if (!isIncognito) runCatching { shelf.cacheRecentChapter(chapter.url, html) }
+                    }
             }
             clear(chapter.title)
             chrome(false)
