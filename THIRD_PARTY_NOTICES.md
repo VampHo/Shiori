@@ -12,3 +12,9 @@ application and its bundled libraries have not been merged.
 
 Royal Road is a third-party source, not affiliated with Shiori. Availability and
 chapter access depend on the source. Shiori does not bypass login or access controls.
+
+The source catalogue adapters in `NovelCatalogRepository.kt` and bundled source
+icons are adapted from QuickNovel's RoyalRoadProvider, FreeWebNovelProvider and
+LibReadProvider and corresponding drawable resources, under GPL-3.0. Original
+source branding belongs to the respective sites. Novel shelf, import and screen
+integration code is maintained separately from the manga implementation.

@@ -13,11 +13,17 @@
         android:layout_width="match_parent" android:layout_height="wrap_content" />
     <LinearLayout android:id="@+id/novel_controls" android:layout_width="match_parent"
         android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="16dp" />
+    <androidx.recyclerview.widget.RecyclerView android:id="@+id/novel_grid"
+        android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+        android:paddingHorizontal="8dp" android:clipToPadding="false" android:visibility="gone" />
     <ScrollView android:id="@+id/novel_scroll" android:layout_width="match_parent"
         android:layout_height="0dp" android:layout_weight="1" android:fillViewport="true">
         <LinearLayout android:id="@+id/novel_content" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" />
     </ScrollView>
+    <com.google.android.material.tabs.TabLayout android:id="@+id/novel_shelves"
+        android:layout_width="match_parent" android:layout_height="48dp" android:visibility="gone"
+        app:tabMode="scrollable" app:tabIndicatorHeight="3dp" />
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/novel_nav" android:layout_width="match_parent" android:layout_height="wrap_content"
         app:labelVisibilityMode="labeled" app:menu="@menu/nav_novels" />

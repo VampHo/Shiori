@@ -68,8 +68,7 @@ jobs:
           script: |
             bash gradlew --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.koitharu.kotatsu.novels.NovelReaderAndroidTest
             mkdir -p ui-screenshots
-            adb pull /sdcard/Android/data/io.github.vampho.shiori.debug/files/novels-explore.png ui-screenshots/ || echo "::warning::Optional UI screenshot was not retained after testing"
-            adb pull /sdcard/Android/data/io.github.vampho.shiori.debug/files/novels-favorites.png ui-screenshots/ || echo "::warning::Optional UI screenshot was not retained after testing"
+            adb pull /sdcard/Pictures/ShioriTests/. ui-screenshots/ || echo "::warning::Optional UI screenshots were not retained after testing"
 
       - name: Upload UI verification screenshots
         continue-on-error: true

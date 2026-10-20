@@ -1,5 +1,6 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:id="@+id/novel_history" android:icon="@drawable/ic_history_selector" android:title="@string/history" />
-    <item android:id="@+id/novel_favorites" android:icon="@drawable/ic_bookmark_selector" android:title="@string/favourites" />
+    <item android:id="@+id/novel_favorites" android:icon="@drawable/ic_bookmark_selector" android:title="@string/novels_library" />
     <item android:id="@+id/novel_explore" android:icon="@drawable/ic_explore_selector" android:title="@string/explore" />
+    <item android:id="@+id/novel_history" android:icon="@drawable/ic_history_selector" android:title="@string/history" />
+    <item android:id="@+id/novel_settings" android:icon="@drawable/ic_settings" android:title="@string/settings" />
 </menu>

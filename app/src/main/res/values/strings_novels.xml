@@ -10,7 +10,7 @@
     <string name="novels_chapter_count">%1$d chapters</string>
     <string name="novels_previous_page">Previous 100 chapters</string>
     <string name="novels_next_page">More chapters</string>
-    <string name="novels_open_website">Open Royal Road in browser</string>
+    <string name="novels_open_website">Open in browser</string>
     <string name="novels_chapters">Chapter list</string>
     <string name="novels_smaller">Smaller text</string>
     <string name="novels_larger">Larger text</string>
@@ -30,4 +30,5 @@
     <string name="novels_find_books">Find novels</string>
     <string name="novels_add_favorite">Add to favorites</string>
     <string name="novels_remove_favorite">Remove from favorites</string>
+    <string name="novels_library">Library</string>
 </resources>
