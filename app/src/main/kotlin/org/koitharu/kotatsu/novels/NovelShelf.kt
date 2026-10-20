@@ -65,8 +65,12 @@ class NovelShelf(private val context: Context) {
         if (!cached.isFile) null else cached.readText().also { cached.setLastModified(System.currentTimeMillis()) }
     }.getOrNull()
     fun cacheRecentChapter(url: String, html: String) {
-        atomicWrite(File(recentRoot, hash(url) + ".html"), html)
-        val files = recentRoot.listFiles()?.filter { it.extension == "html" }?.sortedByDescending { it.lastModified() }.orEmpty()
+        val newest = File(recentRoot, hash(url) + ".html")
+        atomicWrite(newest, html)
+        // Filesystems may give several writes the same timestamp. Always retain this write first.
+        val files = recentRoot.listFiles()?.filter { it.extension == "html" }?.sortedWith(
+            compareByDescending<File> { it.name == newest.name }.thenByDescending { it.lastModified() }
+        ).orEmpty()
         var bytes = 0L
         files.forEachIndexed { index, file ->
             bytes += file.length()
