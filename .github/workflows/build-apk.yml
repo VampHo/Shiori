@@ -68,14 +68,16 @@ jobs:
           script: |
             bash gradlew --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.koitharu.kotatsu.novels.NovelReaderAndroidTest
             mkdir -p ui-screenshots
-            adb pull /sdcard/Android/data/io.github.vampho.shiori.debug/files/novels-explore.png ui-screenshots/
-            adb pull /sdcard/Android/data/io.github.vampho.shiori.debug/files/novels-favorites.png ui-screenshots/
+            adb pull /sdcard/Android/data/io.github.vampho.shiori.debug/files/novels-explore.png ui-screenshots/ || echo "::warning::Optional UI screenshot was not retained after testing"
+            adb pull /sdcard/Android/data/io.github.vampho.shiori.debug/files/novels-favorites.png ui-screenshots/ || echo "::warning::Optional UI screenshot was not retained after testing"
 
       - name: Upload UI verification screenshots
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: ui-verification
           path: ui-screenshots/*.png
+          if-no-files-found: warn
 
       - name: Upload test APK
         uses: actions/upload-artifact@v4
@@ -90,6 +92,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-reports
-          path: app/build/reports/tests/
+          path: |
+            app/build/reports/tests/
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
           if-no-files-found: ignore
           retention-days: 7
