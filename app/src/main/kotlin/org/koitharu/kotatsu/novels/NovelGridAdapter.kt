@@ -65,6 +65,12 @@ class NovelGridAdapter(
         holder.title.text = book.title
         holder.root.contentDescription = book.title
         if (sources) holder.cover.setImageResource(when (book.source) {
+            "novelfire" -> R.drawable.novel_source_novelfire
+            "wattpad" -> R.drawable.novel_source_wattpad
+            "fenrir" -> R.drawable.novel_source_fenrirealm
+            "wuxiaworld" -> R.drawable.novel_source_wuxiaworld
+            "novelfull" -> R.drawable.novel_source_novelfull
+            "readhive" -> R.drawable.novel_source_readhive
             "freewebnovel" -> R.drawable.novel_source_freewebnovel
             "libread" -> R.drawable.novel_source_libread
             else -> R.drawable.novel_source_royalroad

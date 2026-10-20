@@ -5,6 +5,17 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class NovelCatalogRepositoryTest {
+    @Test fun detailCoverNeverUsesTheSiteLogo() {
+        val doc = Jsoup.parse("""<header><img src="/logo.png"></header>
+            <div class="pic"><picture><source srcset="/cover-small.jpg 200w, /cover-large.jpg 600w"><img src="/loading.gif"></picture></div>""", "https://freewebnovel.com")
+        assertEquals("https://freewebnovel.com/cover-large.jpg", NovelCatalogRepository.detailCover(doc))
+        assertEquals("", NovelCatalogRepository.detailCover(Jsoup.parse("<header><img src='/site.png'></header>", "https://freewebnovel.com")))
+    }
+    @Test fun catalogueContainsExactlyRequestedSources() {
+        assertEquals(listOf("NovelFire", "Royal Road", "Wattpad", "FenrirRealm", "WuxiaWorld", "NovelFull", "ReadHive"), NovelCatalogRepository.sources.map { it.name })
+        // Existing downloads from retired catalogue sources must remain readable.
+        assertNotNull(NovelCatalogRepository.sourceFor("https://freewebnovel.com/novel/one"))
+    }
     @Test fun coverAndTitleBelongToTheirOwnBook() {
         val source = NovelCatalogRepository.sources.first()
         val html = """

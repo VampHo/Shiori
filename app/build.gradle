@@ -21,8 +21,8 @@ android {
 		applicationId 'io.github.vampho.shiori'
 		minSdk = 23
 		targetSdk = 36
-		versionCode = 1036
-		versionName = '9.5.0-a3'
+		versionCode = 1037
+		versionName = '9.5.0-a4'
 		generatedDensities = []
 		testInstrumentationRunner 'org.koitharu.kotatsu.HiltTestRunner'
 		ksp {
@@ -123,7 +123,7 @@ dependencies {
 		parsersVersion = System.getProperty('parsersVersionOverride')
 	}
 	//noinspection UseTomlInstead
-	implementation("com.github.KotatsuApp:kotatsu-parsers:$parsersVersion") {
+	implementation("com.github.clquwu:kotatsu-parsers-redo:$parsersVersion") {
 		exclude group: 'org.json', module: 'json'
 	}
 

@@ -47,9 +47,17 @@ class NovelShelf(private val context: Context) {
         NovelDetails(link.title, link.url, json.optString("synopsis"), (0 until array.length()).map { fromJson(array.getJSONObject(it)) }, link.cover, link.source, json.optString("author"))
     }.getOrNull()
     fun cacheDetails(book: NovelDetails) {
-        val json = toJson(book.link()).put("synopsis", book.synopsis).put("author", book.author)
+        val json = toJson(book.link()).put("coverVersion", 2).put("synopsis", book.synopsis).put("author", book.author)
         val array = JSONArray(); book.chapters.forEach { array.put(toJson(it)) }; json.put("chapters", array)
         atomicWrite(file(book.url, ".json"), json.toString())
+    }
+    fun needsCoverRepair(book: NovelLink): Boolean = book.source != "local" &&
+        (!NovelCatalogRepository.validCover(book.cover) || runCatching { JSONObject(file(book.url, ".json").readText()).optInt("coverVersion") < 2 }.getOrDefault(false))
+    fun repairCover(book: NovelLink, cover: String): NovelLink {
+        val fixed = book.copy(cover = cover)
+        cachedDetails(book.url)?.let { cacheDetails(it.copy(cover = cover)) }
+        remember(fixed)
+        return fixed
     }
     fun cachedChapter(url: String): String? = file(url, ".html").takeIf { it.isFile }?.readText()
     fun hasChapter(url: String) = file(url, ".html").isFile

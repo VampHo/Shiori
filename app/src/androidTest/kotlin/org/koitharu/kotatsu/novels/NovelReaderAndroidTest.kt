@@ -47,7 +47,7 @@ class NovelReaderAndroidTest {
                 assertEquals(2, modes.tabCount)
                 assertEquals(1, modes.selectedTabPosition)
                 assertTrue(modes.isShown)
-                assertEquals(3, activity.findViewById<RecyclerView>(R.id.novel_grid).adapter!!.itemCount)
+                assertEquals(7, activity.findViewById<RecyclerView>(R.id.novel_grid).adapter!!.itemCount)
                 assertTrue(activity.findViewById<BottomNavigationView>(R.id.novel_nav).isShown)
             }
             screenshot("novels-explore.png")
@@ -108,6 +108,29 @@ class NovelReaderAndroidTest {
             }
             screenshot("novels-library-grid.png")
         }
+    }
+
+    @Test fun coverRepairPreservesDownloadedChapters() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val shelf = NovelShelf(context)
+        val book = NovelDetails("Cover repair", "https://www.royalroad.com/fiction/fixture", "", listOf(NovelLink("One", "local:cover-fixture")), "https://example.org/logo.png")
+        shelf.cacheDetails(book); shelf.cacheChapter(book.chapters[0].url, "<p>Keep this download</p>")
+        shelf.downloaded(book); shelf.setStatus(book.link(), "Reading")
+        assertTrue(shelf.needsCoverRepair(book.link()))
+        val fixed = shelf.repairCover(book.link(), "https://example.org/story-cover.jpg")
+        assertEquals(fixed.cover, shelf.books("downloads").single().cover)
+        assertEquals(fixed.cover, shelf.cachedDetails(book.url)!!.cover)
+        assertEquals("Reading", shelf.status(book.url))
+        assertTrue(shelf.cachedChapter(book.chapters[0].url)!!.contains("Keep this download"))
+        shelf.removeDownload(fixed)
+    }
+
+    @Test fun sourceJsonSupportsMultilineAndBracesInsideStrings() {
+        val json = SelectedNovelSources.jsonObjectAfter("""window.prefetched = {
+            "text": "A {brace} in the story", "nested": {"value": 4}
+        }; anotherFunction();""", "window.prefetched")
+        assertEquals("A {brace} in the story", json.getString("text"))
+        assertEquals(4, json.getJSONObject("nested").getInt("value"))
     }
 
     private fun screenshot(name: String) {

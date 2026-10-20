@@ -1,6 +1,9 @@
 package org.koitharu.kotatsu.novels
 
 import coil3.request.target
+import coil3.request.placeholder
+import coil3.request.error
+import coil3.request.fallback
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
@@ -35,7 +38,7 @@ import org.koitharu.kotatsu.databinding.ActivityNovelsBinding
 class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
     private val repository = NovelCatalogRepository()
     private val shelf by lazy { NovelShelf(this) }
-    private val images by lazy { coil3.ImageLoader.Builder(applicationContext).components { add(coil3.network.okhttp.OkHttpNetworkFetcherFactory()) }.build() }
+    private val images by lazy { NovelImages.get(applicationContext) }
     private var selectedSource: NovelSource? = null
     private var browsePage = 1
     private var order = ""
@@ -45,6 +48,9 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
     private var listMode = false
     private var catalogLoaded = false
     private var downloadJob: Job? = null
+    private var coverRepairJob: Job? = null
+    private val coverRepairAttempted = mutableSetOf<String>()
+    private var selectedBook: NovelLink? = null
     private val importLauncher: androidx.activity.result.ActivityResultLauncher<Array<String>> = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) load({ importLauncher.launch(arrayOf("application/epub+zip", "text/plain")) }) {
             novel = shelf.importBook(uri)
@@ -241,13 +247,36 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
         viewBinding.novelScroll.isVisible = false
         viewBinding.novelGrid.isVisible = true
         viewBinding.novelGrid.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, if (listMode && !sources) 1 else 3)
+        if (!sources && section != R.id.novel_explore) repairCovers(books)
         viewBinding.novelGrid.adapter = NovelGridAdapter(images, books, sources, listMode && !sources, onClick = { book ->
             if (sources) {
                 selectedSource = NovelCatalogRepository.sources.first { it.id == book.source }
                 order = selectedSource!!.orders.first().second; genre = ""; query = ""; browsePage = 1; results = emptyList(); browse()
-            } else openNovel(book.url, if (section == R.id.novel_history && !isIncognito) progress.getString("chapter:${book.url}", null) else null,
-                if (isIncognito) 0 else progress.getInt("offset:${book.url}", 0))
+            } else { selectedBook = book; openNovel(book.url, if (section == R.id.novel_history && !isIncognito) progress.getString("chapter:${book.url}", null) else null,
+                if (isIncognito) 0 else progress.getInt("offset:${book.url}", 0)) }
         }, onLongClick = { book -> if (!sources) bookActions(book) })
+    }
+
+    private fun repairCovers(books: List<NovelLink>) {
+        if (coverRepairJob?.isActive == true) return
+        val pending = books.filter { it.url !in coverRepairAttempted && shelf.needsCoverRepair(it) }.take(12)
+        if (pending.isEmpty()) return
+        val originalSection = section
+        coverRepairJob = lifecycleScope.launch {
+            var changed = false
+            for (book in pending) {
+                coverRepairAttempted.add(book.url)
+                try {
+                    val cover = repository.bookCover(book.url)
+                    if (cover.isNotBlank()) {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { shelf.repairCover(book, cover) }
+                        changed = true
+                        if (novel == null && section == originalSection && section != R.id.novel_explore) showSearch()
+                    }
+                } catch (e: CancellationException) { throw e } catch (_: Exception) { /* Keep the existing book and retry next launch. */ }
+            }
+            if (changed && novel == null && section == originalSection && section != R.id.novel_explore) showSearch()
+        }
     }
 
     private fun empty(message: String, action: String? = null, click: () -> Unit = {}) {
@@ -371,7 +400,15 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
     private fun openNovel(url: String, resumeChapter: String? = null, offset: Int = 0) {
         load({ openNovel(url, resumeChapter, offset) }) {
             novel = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                shelf.cachedDetails(url) ?: repository.details(url).also { shelf.cacheDetails(it) }
+                val cached = shelf.cachedDetails(url)
+                val hint = selectedBook?.takeIf { it.url == url }
+                val book = cached ?: repository.details(url)
+                val cover = when {
+                    hint != null && NovelCatalogRepository.validCover(hint.cover) && (section == R.id.novel_explore || !shelf.needsCoverRepair(hint)) -> hint.cover
+                    cached != null && shelf.needsCoverRepair(cached.link()) -> try { repository.bookCover(url) } catch (e: CancellationException) { throw e } catch (_: Exception) { "" }
+                    else -> book.cover
+                }
+                book.copy(cover = cover.ifBlank { if (NovelCatalogRepository.validCover(book.cover)) book.cover else "" }).also { shelf.cacheDetails(it) }
             }
             shelf.remember(novel!!.link())
             chapterIndex = -1
@@ -389,16 +426,17 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
         clear(book.title)
         chrome(false)
         chapterIndex = -1
-        val cover = android.widget.ImageView(this).apply { scaleType = android.widget.ImageView.ScaleType.CENTER_CROP }
+        val cover = android.widget.ImageView(this).apply { scaleType = android.widget.ImageView.ScaleType.FIT_CENTER }
         viewBinding.novelContent.addView(cover, LinearLayout.LayoutParams(dp(120), dp(174)).apply { gravity = Gravity.CENTER_HORIZONTAL; bottomMargin = dp(12) })
-        images.enqueue(coil3.request.ImageRequest.Builder(this).data(book.cover.ifBlank { null }).target(cover).build())
+        images.enqueue(coil3.request.ImageRequest.Builder(this).data(book.cover.ifBlank { null }).placeholder(R.drawable.ic_book_page).fallback(R.drawable.ic_book_page).error(R.drawable.ic_book_page).target(cover).build())
         label(book.title, 24f)
         label(listOf(book.author, if (book.source == "local") "Imported book" else NovelCatalogRepository.sourceFor(book.url)?.name.orEmpty()).filter { it.isNotBlank() }.joinToString(" · "), 14f)
         button(if (savedBooks("favorites").any { it.url == book.url }) "Library · ${shelf.status(book.url)}" else "Add to library") { bookActions(book.link()) }
         button(if (downloadJob?.isActive == true) "Download in progress…" else "Download chapters") { downloadChapters(book) }
         if (book.source != "local") button("Refresh chapter list") {
             load({ openNovel(book.url) }) {
-                novel = repository.details(book.url)
+                novel = repository.details(book.url).let { fresh -> fresh.copy(cover = fresh.cover.ifBlank { book.cover }) }
+                shelf.remember(novel!!.link())
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { shelf.cacheDetails(novel!!) }
                 showChapters()
             }

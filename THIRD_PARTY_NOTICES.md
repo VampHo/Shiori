@@ -18,3 +18,11 @@ icons are adapted from QuickNovel's RoyalRoadProvider, FreeWebNovelProvider and
 LibReadProvider and corresponding drawable resources, under GPL-3.0. Original
 source branding belongs to the respective sites. Novel shelf, import and screen
 integration code is maintained separately from the manga implementation.
+
+The selected novel adapters and protobuf codec additionally adapt QuickNovel's
+NovelFireProvider, WattpadProvider, FenrirRealProvider, WuxiaWorldProvider,
+AllNovelProvider/NovelFullProvider and ReadhiveProvider, including their source icons.
+
+The updated manga parser dependency (dc223c3d80), detached WebView viewport and
+request interception support follow the provided Kotatsu-Redo-devel source archive
+from Kotatsu-Redo/Kotatsu-Redo, under GPL-3.0. The existing manga UI is retained.

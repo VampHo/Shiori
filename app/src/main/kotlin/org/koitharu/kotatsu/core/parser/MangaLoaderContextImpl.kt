@@ -1,6 +1,10 @@
 package org.koitharu.kotatsu.core.parser
 
 import android.annotation.SuppressLint
+import org.koitharu.kotatsu.core.network.webview.WebViewRequestInterceptorExecutor
+import org.koitharu.kotatsu.parsers.webview.InterceptedRequest
+import org.koitharu.kotatsu.parsers.webview.InterceptionConfig as ParsersInterceptionConfig
+import org.koitharu.kotatsu.core.exceptions.CloudFlareProtectedException
 import android.content.Context
 import android.util.Base64
 import androidx.core.os.LocaleListCompat
@@ -38,15 +42,16 @@ class MangaLoaderContextImpl @Inject constructor(
 	override val cookieJar: MutableCookieJar,
 	@ApplicationContext private val androidContext: Context,
 	private val webViewExecutor: WebViewExecutor,
+    private val webViewRequestInterceptorExecutor: WebViewRequestInterceptorExecutor,
 ) : MangaLoaderContext() {
 
 	private val jsTimeout = TimeUnit.SECONDS.toMillis(4)
 
 	@Deprecated("Provide a base url")
 	@SuppressLint("SetJavaScriptEnabled")
-	override suspend fun evaluateJs(script: String): String? = evaluateJs("", script)
+	override suspend fun evaluateJs(script: String): String? = evaluateJs("", script, jsTimeout)
 
-	override suspend fun evaluateJs(baseUrl: String, script: String): String? = withTimeout(jsTimeout) {
+	override suspend fun evaluateJs(baseUrl: String, script: String, timeout: Long): String? = withTimeout(timeout) {
 		webViewExecutor.evaluateJs(baseUrl, script)
 	}
 
@@ -87,4 +92,62 @@ class MangaLoaderContextImpl @Inject constructor(
 	}
 
 	override fun createBitmap(width: Int, height: Int): Bitmap = BitmapWrapper.create(width, height)
+    override suspend fun interceptWebViewRequests(
+        url: String,
+        interceptorScript: String,
+        timeout: Long
+    ): List<InterceptedRequest> {
+        val config = org.koitharu.kotatsu.core.network.webview.InterceptionConfig(
+            timeoutMs = timeout,
+            maxRequests = 100,
+            filterScript = interceptorScript
+        )
+
+        val captured = webViewRequestInterceptorExecutor.interceptRequests(url, config)
+        return captured.map { appRequest ->
+            InterceptedRequest(
+                url = appRequest.url,
+                method = appRequest.method,
+                headers = appRequest.headers,
+                timestamp = appRequest.timestamp,
+                body = appRequest.body
+            )
+        }
+    }
+
+    // New method to support InterceptionConfig with pageScript
+    override suspend fun interceptWebViewRequests(
+        url: String,
+        config: ParsersInterceptionConfig
+    ): List<InterceptedRequest> {
+        val appConfig = org.koitharu.kotatsu.core.network.webview.InterceptionConfig(
+            timeoutMs = config.timeoutMs,
+            maxRequests = config.maxRequests,
+            urlPattern = config.urlPattern,
+            filterScript = config.filterScript,
+            pageScript = config.pageScript  // This is the key part that was missing!
+        )
+
+        val captured = webViewRequestInterceptorExecutor.interceptRequests(url, appConfig)
+        return captured.map { appRequest ->
+            InterceptedRequest(
+                url = appRequest.url,
+                method = appRequest.method,
+                headers = appRequest.headers,
+                timestamp = appRequest.timestamp,
+                body = appRequest.body
+            )
+        }
+    }
+
+    override suspend fun captureWebViewUrls(
+        pageUrl: String,
+        urlPattern: Regex,
+        timeout: Long
+    ): List<String> {
+        return webViewRequestInterceptorExecutor.captureWebViewUrls(pageUrl, urlPattern, timeout)
+    }
+
+    override fun requestCloudflareVerification(parser: MangaParser, url: String): Nothing =
+        throw CloudFlareProtectedException(url, parser.source, parser.getRequestHeaders())
 }
