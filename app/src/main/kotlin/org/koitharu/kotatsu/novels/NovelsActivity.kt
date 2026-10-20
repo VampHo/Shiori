@@ -68,6 +68,10 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
     private var query = ""
     private var results = emptyList<NovelLink>()
     private var fontSize = 20f
+    private val readerOptions by lazy { NovelReaderOptions(this) }
+    private var readerControlsVisible = true
+    private var chapterHeading: TextView? = null
+    private var readerFooter: LinearLayout? = null
     private var readingText: TextView? = null
     private var page = 0
     private var section = R.id.novel_explore
@@ -151,6 +155,7 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
     private fun goBack() {
         task?.cancel()
         if (chapterIndex >= 0) {
+            if (!readerControlsVisible) { readerControlsVisible = true; applyReaderAppearance(); return }
             savePosition()
             chapterIndex = -1
             showChapters()
@@ -165,6 +170,18 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
     private fun clear(title: String) {
         supportActionBar?.title = title
         readingText = null
+        chapterHeading = null
+        readerFooter = null
+        viewBinding.novelControls.isVisible = true
+        val background = android.util.TypedValue()
+        theme.resolveAttribute(android.R.attr.colorBackground, background, true)
+        viewBinding.root.setBackgroundColor(background.data)
+        viewBinding.novelContent.setPadding(dp(20), dp(20), dp(20), dp(20))
+        val controller = WindowInsetsControllerCompat(window, viewBinding.root)
+        controller.show(WindowInsetsCompat.Type.systemBars())
+        val light = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK != android.content.res.Configuration.UI_MODE_NIGHT_YES
+        controller.isAppearanceLightStatusBars = light
+        controller.isAppearanceLightNavigationBars = light
         window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         viewBinding.novelGrid.isVisible = false
         viewBinding.novelGrid.adapter = null
@@ -375,26 +392,51 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
 
     private fun showSettings() {
         label("Novel settings", 24f)
-        button("Text size · ${fontSize.toInt()}") {
-            choice("Reading text size", (14..32 step 2).map { it.toString() }, fontSize.toInt().toString()) {
-                fontSize = it.toFloat(); progress.edit { putFloat("font_size", fontSize) }; showSearch()
-            }
-        }
-        button("Typeface · ${progress.getString("reader_font", "Serif")}") {
-            choice("Reader typeface", listOf("Serif", "Sans serif"), progress.getString("reader_font", "Serif").orEmpty()) {
-                progress.edit { putString("reader_font", it) }; showSearch()
-            }
-        }
-        button("Line spacing · ${progress.getString("reader_spacing", "Comfortable")}") {
-            choice("Line spacing", listOf("Compact", "Comfortable", "Spacious"), progress.getString("reader_spacing", "Comfortable").orEmpty()) {
-                progress.edit { putString("reader_spacing", it) }; showSearch()
-            }
-        }
-        val keep = progress.getBoolean("keep_screen", false)
-        button("Keep screen on while reading · ${if (keep) "On" else "Off"}") { progress.edit { putBoolean("keep_screen", !keep) }; showSearch() }
+        viewBinding.novelContent.addView(readerOptions.build { fontSize = progress.getFloat("font_size", 20f) })
+        label("Library", 18f)
         button("Default layout · ${if (listMode) "List" else "Grid"}") { toggleLayout() }
-        label("Imports: EPUB and UTF-8 text. Downloaded chapters and imported books are available offline.", 14f)
-        label("Long-press a cover to organize your library. Reading progress is saved automatically unless incognito mode is enabled.", 14f)
+        label("Import EPUB or text books from Library. Long-press a cover to organize it. Downloads and imported books work offline.", 14f)
+    }
+
+    private fun applyReaderAppearance() {
+        val text = readingText ?: return
+        // Preserve the first visible character when font size or margins change.
+        val scroll = viewBinding.novelScroll
+        val oldScroll = scroll.scrollY
+        val beforeText = oldScroll < text.top
+        val line = text.layout?.getLineForVertical((scroll.scrollY - text.top).coerceAtLeast(0)) ?: 0
+        val character = text.layout?.getLineStart(line) ?: 0
+        readerOptions.style(text)
+        chapterHeading?.setTextColor(readerOptions.colors.second)
+        viewBinding.root.setBackgroundColor(readerOptions.colors.first)
+        val chromeColor = android.util.TypedValue()
+        theme.resolveAttribute(android.R.attr.colorBackground, chromeColor, true)
+        viewBinding.toolbar.setBackgroundColor(chromeColor.data)
+        viewBinding.novelControls.setBackgroundColor(chromeColor.data)
+        readerFooter?.let { footer ->
+            for (i in 0 until footer.childCount) (footer.getChildAt(i) as? TextView)?.setTextColor(readerOptions.colors.second)
+        }
+        viewBinding.novelContent.setPadding(dp(readerOptions.margin), dp(20), dp(readerOptions.margin), dp(20))
+        viewBinding.toolbar.isVisible = readerControlsVisible
+        viewBinding.novelControls.isVisible = readerControlsVisible
+        readerFooter?.isVisible = readerControlsVisible
+        val controller = WindowInsetsControllerCompat(window, viewBinding.root)
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (readerOptions.fullscreen && !readerControlsVisible) controller.hide(WindowInsetsCompat.Type.systemBars())
+        else controller.show(WindowInsetsCompat.Type.systemBars())
+        val light = progress.getString("reader_theme", "Dark") in listOf("Light", "Sepia")
+        controller.isAppearanceLightStatusBars = light
+        controller.isAppearanceLightNavigationBars = light
+        if (readerOptions.keepScreen) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        text.post { text.layout?.let { scroll.scrollTo(0, if(beforeText) oldScroll else text.top + it.getLineTop(it.getLineForOffset(character.coerceAtMost(text.length())))) } }
+    }
+
+    private fun readerAppearanceDialog() {
+        val scroll = android.widget.ScrollView(this)
+        scroll.addView(readerOptions.build { applyReaderAppearance() })
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("Reader appearance").setView(scroll).setPositiveButton("Done", null).show()
     }
 
     private fun openNovel(url: String, resumeChapter: String? = null, offset: Int = 0) {
@@ -484,30 +526,21 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
             button(getString(R.string.novels_chapters), viewBinding.novelControls) {
                 savePosition(); chapterIndex = -1; showChapters()
             }
-            val sizes = LinearLayout(this@NovelsActivity)
-            viewBinding.novelControls.addView(sizes)
-            listOf(-2f to "A−", 2f to "A+").forEach { (delta, name) ->
-                sizes.addView(MaterialButton(this@NovelsActivity, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
-                    text = name
-                    contentDescription = getString(if (delta < 0) R.string.novels_smaller else R.string.novels_larger)
-                    setOnClickListener {
-                        fontSize = (fontSize + delta).coerceIn(14f, 32f)
-                        readingText?.textSize = fontSize
-                        progress.edit { putFloat("font_size", fontSize) }
-                    }
-                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            }
-            label(chapter.title, 24f)
+            button("Appearance", viewBinding.novelControls) { readerAppearanceDialog() }
+            button("Hide controls", viewBinding.novelControls) { readerControlsVisible = false; applyReaderAppearance() }
+            chapterHeading = label(chapter.title, 24f)
             readingText = label(HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_COMPACT), fontSize).apply {
-                typeface = Typeface.create(if (progress.getString("reader_font", "Serif") == "Serif") "serif" else "sans-serif", Typeface.NORMAL)
                 setTextIsSelectable(true)
-                setLineSpacing(0f, when (progress.getString("reader_spacing", "Comfortable")) { "Compact" -> 1.2f; "Spacious" -> 1.7f; else -> 1.4f })
+                setOnClickListener { readerControlsVisible = !readerControlsVisible; applyReaderAppearance() }
             }
-            if (progress.getBoolean("keep_screen", false)) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            readerFooter = LinearLayout(this@NovelsActivity).apply { orientation = LinearLayout.VERTICAL }
+            viewBinding.novelContent.addView(readerFooter)
             if (!isIncognito && shelf.status(book.url) != "Completed") shelf.setStatus(book.link(), "Reading")
-            if (index > 0) button(getString(R.string.novels_previous_chapter)) { openChapter(index - 1) }
-            if (index < book.chapters.lastIndex) button(getString(R.string.novels_next_chapter)) { openChapter(index + 1) }
-            if (book.source != "local") button(getString(R.string.novels_open_website)) { openWebsite(chapter.url) }
+            if (index > 0) button(getString(R.string.novels_previous_chapter), readerFooter!!) { openChapter(index - 1) }
+            if (index < book.chapters.lastIndex) button(getString(R.string.novels_next_chapter), readerFooter!!) { openChapter(index + 1) }
+            if (book.source != "local") button(getString(R.string.novels_open_website), readerFooter!!) { openWebsite(chapter.url) }
+            readerControlsVisible = !readerOptions.fullscreen
+            applyReaderAppearance()
             viewBinding.novelScroll.post {
                 viewBinding.novelScroll.scrollTo(0, offset)
                 savePosition()
@@ -518,11 +551,42 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
     private fun downloadChapters(book: NovelDetails) {
         if (book.source == "local") { android.widget.Toast.makeText(this, "This book is already available offline", android.widget.Toast.LENGTH_SHORT).show(); return }
         if (downloadJob?.isActive == true) { android.widget.Toast.makeText(this, "A download is already running", android.widget.Toast.LENGTH_SHORT).show(); return }
-        val choices = listOf("Next 10 chapters", "Next 50 chapters", "All chapters")
+        val lastUrl = progress.getString("chapter:${book.url}", null)
+        val start = book.chapters.indexOfFirst { it.url == lastUrl }.coerceAtLeast(0)
+        val choices = listOf("Next 10 chapters", "Next 50 chapters", "All chapters", "Custom range…")
         choice("Download ${book.title}", choices, choices.first()) { selected ->
-            val lastUrl = progress.getString("chapter:${book.url}", null)
-            val start = book.chapters.indexOfFirst { it.url == lastUrl }.coerceAtLeast(0)
-            val chapters = if (selected == "All chapters") book.chapters else book.chapters.drop(start).take(if (selected == choices.first()) 10 else 50)
+            if (selected == "Custom range…") customDownload(book, start + 1)
+            else startDownload(book, if (selected == "All chapters") book.chapters else book.chapters.drop(start).take(if(selected == choices.first()) 10 else 50))
+        }
+    }
+
+    private fun customDownload(book: NovelDetails, initial: Int) {
+        val panel = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(24),dp(8),dp(24),dp(8)) }
+        panel.addView(TextView(this).apply { text="Choose positions in the chapter list (1–${book.chapters.size}), inclusive. Already downloaded chapters are skipped." })
+        fun input(label: String, value: Int) = com.google.android.material.textfield.TextInputLayout(this).apply {
+            hint=label
+            addView(com.google.android.material.textfield.TextInputEditText(context).apply { inputType=android.text.InputType.TYPE_CLASS_NUMBER; setText(value.toString()) })
+            panel.addView(this)
+        }
+        val first=input("From chapter",initial)
+        val last=input("Through chapter",(initial+49).coerceAtMost(book.chapters.size))
+        val dialog=com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle("Custom download")
+            .setView(panel).setNegativeButton("Cancel",null).setPositiveButton("Download",null).create()
+        dialog.setOnShowListener {
+            dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                val from=first.editText?.text.toString().toIntOrNull()
+                val to=last.editText?.text.toString().toIntOrNull()
+                first.error=null; last.error=null
+                if(from == null || from !in 1..book.chapters.size) first.error="Enter 1–${book.chapters.size}"
+                else if(to == null || to !in from..book.chapters.size) last.error="Enter $from–${book.chapters.size}"
+                else { dialog.dismiss(); startDownload(book,book.chapters.subList(from-1,to)) }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun startDownload(book: NovelDetails, chapters: List<NovelLink>) {
+        if (chapters.isEmpty() || downloadJob?.isActive == true) return
             val indicator = com.google.android.material.progressindicator.LinearProgressIndicator(this).apply { max = chapters.size }
             val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle("Downloading chapters")
                 .setMessage("Keep this screen open. Completed chapters are retained if you cancel.")
@@ -541,13 +605,13 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
                             kotlinx.coroutines.delay(1000)
                         } else shelf.downloaded(book)
                         indicator.progress = index + 1
+                        dialog.setMessage("${index + 1} of ${chapters.size} chapters ready. Completed chapters are retained if you cancel.")
                     }
                     android.widget.Toast.makeText(this@NovelsActivity, "Chapters saved for offline reading", android.widget.Toast.LENGTH_LONG).show()
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { android.widget.Toast.makeText(this@NovelsActivity, "Download stopped: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show() }
                 finally { dialog.dismiss(); if (!isFinishing && !isDestroyed && novel?.url == book.url && chapterIndex < 0) showChapters() }
             }
-        }
     }
 
     private fun openWebsite(url: String) {

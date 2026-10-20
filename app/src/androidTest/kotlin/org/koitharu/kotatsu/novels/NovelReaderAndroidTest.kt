@@ -133,6 +133,51 @@ class NovelReaderAndroidTest {
         assertEquals(4, json.getJSONObject("nested").getInt("value"))
     }
 
+    @Test fun readerAppearancePersistsAndFullscreenControlsCanBeRestored() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val prefs = context.getSharedPreferences("shiori_novels", 0)
+        prefs.edit().putString("reader_theme", "Sepia").putString("reader_font", "Monospace")
+            .putFloat("font_size", 24f).putBoolean("reader_fullscreen", true).commit()
+        val shelf = NovelShelf(context)
+        val chapter = NovelLink("Reader test chapter", "local:reader-settings/chapter", source="local")
+        val book = NovelDetails("Reader settings test", "local:reader-settings", "", listOf(chapter), source="local")
+        shelf.cacheDetails(book); shelf.cacheChapter(chapter.url, "<p>Offline reading sample.</p>".repeat(100))
+        try {
+            ActivityScenario.launch(NovelsActivity::class.java).use { scenario ->
+                scenario.onActivity { activity ->
+                    val method = NovelsActivity::class.java.getDeclaredMethod("openNovel", String::class.java, String::class.java, Int::class.javaPrimitiveType)
+                    method.isAccessible = true
+                    method.invoke(activity, book.url, chapter.url, 0)
+                }
+                var ready = false
+                val deadline = System.currentTimeMillis() + 10000
+                while (!ready && System.currentTimeMillis() < deadline) {
+                    InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+                    scenario.onActivity { activity ->
+                        val content = activity.findViewById<android.widget.LinearLayout>(R.id.novel_content)
+                        ready = (0 until content.childCount).any { (content.getChildAt(it) as? android.widget.TextView)?.text?.contains("Offline reading sample") == true }
+                    }
+                    if (!ready) Thread.sleep(50)
+                }
+                assertTrue("Cached chapter should open", ready)
+                scenario.onActivity { activity ->
+                    val content = activity.findViewById<android.widget.LinearLayout>(R.id.novel_content)
+                    val text = (0 until content.childCount).map { content.getChildAt(it) }.filterIsInstance<android.widget.TextView>().first { it.text.contains("Offline reading sample") }
+                    assertFalse(activity.findViewById<android.view.View>(R.id.toolbar).isShown)
+                    assertEquals(NovelReaderOptions(activity).colors.second, text.currentTextColor)
+                    assertEquals(24f * activity.resources.displayMetrics.scaledDensity, text.textSize, 0.1f)
+                    text.performClick()
+                    assertTrue(activity.findViewById<android.view.View>(R.id.toolbar).isShown)
+                    text.performClick()
+                    assertFalse(activity.findViewById<android.view.View>(R.id.toolbar).isShown)
+                    activity.onBackPressedDispatcher.onBackPressed()
+                    assertTrue(activity.findViewById<android.view.View>(R.id.toolbar).isShown)
+                }
+                screenshot("novels-reader-sepia.png")
+            }
+        } finally { shelf.removeDownload(book.link()) }
+    }
+
     private fun screenshot(name: String) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.waitForIdleSync()
