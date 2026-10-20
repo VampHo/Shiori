@@ -96,9 +96,9 @@ class WuxiaNovelSource(private val request: suspend (String, Map<String, String>
                                         }
                                         if (name.isNotEmpty() && isFree) {
                                             chapters.add(
-                                                newNovelLink(
+                                                NovelLink(
                                                     name,
-                                                    "$mainUrl/novel/${item.slug}/$chSlug"
+                                                    "$mainUrl/novel/${item.slug}/$chSlug", source = "wuxiaworld"
                                                 )
                                             )
                                         }

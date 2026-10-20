@@ -23,7 +23,7 @@ class RequestInterceptorWebViewClient(
     callback: BrowserCallback,
     private val config: InterceptionConfig,
     private val interceptor: WebViewRequestInterceptor,
-) : BrowserClient(callback) {
+) : BrowserClient(callback, null) {
 
     private val capturedRequests = Collections.synchronizedList(mutableListOf<InterceptedRequest>())
     private val mutex = Mutex()

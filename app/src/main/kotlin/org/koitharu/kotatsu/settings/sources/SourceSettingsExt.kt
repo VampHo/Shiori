@@ -31,6 +31,8 @@ private fun PreferenceFragmentCompat.addPreferencesFromParserRepository(reposito
 	val screen = preferenceScreen
 	for (key in configKeys) {
 		val preference: Preference = when (key) {
+			// These capabilities are controlled by the parser, not user-facing settings.
+			is ConfigKey.DisableUpdateChecking, is ConfigKey.InterceptCloudflare -> continue
 			is ConfigKey.Domain -> {
 				val presetValues = key.presetValues
 				if (presetValues.size <= 1) {
