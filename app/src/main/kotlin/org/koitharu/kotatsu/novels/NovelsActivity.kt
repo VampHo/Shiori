@@ -36,7 +36,7 @@ import org.koitharu.kotatsu.databinding.ActivityNovelsBinding
 
 /** First integrated novel reader. Manga storage and navigation remain independent. */
 class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
-    private val repository = NovelCatalogRepository()
+    private val repository by lazy { NovelCatalogRepository() }
     private val shelf by lazy { NovelShelf(this) }
     private val images by lazy { NovelImages.get(applicationContext) }
     private var selectedSource: NovelSource? = null
@@ -58,6 +58,16 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
             page = 0
             showChapters()
         }
+    }
+    private var retryAfterSourceBrowser: (() -> Unit)? = null
+    private val sourceBrowser = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) {
+        retryAfterSourceBrowser?.also { retryAfterSourceBrowser = null; it() }
+    }
+    private fun verifySource(url: String, retry: () -> Unit) {
+        retryAfterSourceBrowser = retry
+        sourceBrowser.launch(org.koitharu.kotatsu.core.nav.AppRouter.browserIntent(this,
+            url.substringBefore("/__data.json"), null, selectedSource?.name ?: "Novel source")
+            .putExtra(org.koitharu.kotatsu.core.nav.AppRouter.KEY_USER_AGENT, NovelHttp.userAgent))
     }
     private val isIncognito: Boolean
         get() = EntryPointAccessors.fromApplication<BaseActivityEntryPoint>(applicationContext).settings.isIncognitoModeEnabled
@@ -88,6 +98,7 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NovelHttp.initialize(applicationContext)
         setContentView(ActivityNovelsBinding.inflate(layoutInflater))
         setDisplayHomeAsUp(true, false)
         findViewById<TabLayout>(R.id.reading_modes).apply {
@@ -646,8 +657,14 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
                 throw e
             } catch (e: Exception) {
                 clear(getString(R.string.novels_title))
-                label(getString(R.string.novels_error, e.localizedMessage ?: e.javaClass.simpleName))
+                label(selectedSource?.name ?: novel?.title ?: getString(R.string.novels_title), 22f)
+                val message = if (e is java.io.InterruptedIOException) {
+                    "The source took too long to respond. Check your connection and retry; your library and downloads are still saved."
+                } else e.localizedMessage ?: e.javaClass.simpleName
+                label(getString(R.string.novels_error, message))
+                if (e is NovelAccessException) button("Verify / sign in to source") { verifySource(e.address, retry) }
                 button(getString(R.string.novels_retry)) { retry() }
+                if (novel == null) button("Back to sources") { selectedSource = null; query = ""; libraryQuery = ""; results = emptyList(); showSearch() }
                 button(getString(R.string.novels_open_website)) { openWebsite(novel?.url ?: selectedSource?.base ?: RoyalRoadRepository.BASE) }
             }
         }

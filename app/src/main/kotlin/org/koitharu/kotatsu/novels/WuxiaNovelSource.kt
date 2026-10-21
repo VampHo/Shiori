@@ -16,7 +16,7 @@ class WuxiaNovelSource(private val request: suspend (String, Map<String, String>
     private val mainUrl = "https://www.wuxiaworld.com"
     private val api = "https://api2.wuxiaworld.com/wuxiaworld.api.v2"
     private val getChaptersList = "$api.Chapters/GetChapterList"
-    private val client = OkHttpClient.Builder().callTimeout(30, TimeUnit.SECONDS).build()
+    private val client by lazy { NovelHttp.client }
     data class NovelDetail(val id: Int, val slug: String)
 
     suspend fun search(title: String?, order: String, genre: String): List<NovelLink> {
@@ -50,8 +50,10 @@ class WuxiaNovelSource(private val request: suspend (String, Map<String, String>
     private suspend fun grpcPost(url: String, fields: Map<Int, Any>, referer: String): BufferedSource {
         val body = fields.toList().encodeProto().toGrpcWeb().toRequestBody("application/grpc-web+proto".toMediaType())
         val req = Request.Builder().url(url).post(body).header("Referer",referer).header("Accept","application/grpc-web+proto")
+            .header("User-Agent", NovelHttp.userAgent).header("Origin", mainUrl)
             .header("X-User-Agent","grpc-web-javascript/0.1").header("x-grpc-web","1").build()
         return client.newCall(req).await().use { response ->
+            if (response.code == 401 || response.code == 403) throw NovelAccessException(referer, "WuxiaWorld requires verification or sign-in. Open the source, then return to retry.")
             if(!response.isSuccessful) throw IOException("WuxiaWorld returned HTTP ${response.code}")
             val data = response.body?.source() ?: throw IOException("Empty WuxiaWorld response")
             val out = Buffer()
@@ -336,10 +338,15 @@ class WuxiaNovelSource(private val request: suspend (String, Map<String, String>
         while (!exhausted()) {
             val flags = readByte()
             val length = readInt()
-            if (flags.toInt() != 0) { // Skip trailers or compressed chunks
-                if (length > 0) skip(length.toLong())
+            if (length < 0 || length > 16 * 1024 * 1024) throw IOException("Invalid WuxiaWorld response")
+            if ((flags.toInt() and 0x80) != 0) {
+                val trailers = readUtf8(length.toLong())
+                val status = trailers.lineSequence().firstOrNull { it.startsWith("grpc-status:") }
+                    ?.substringAfter(':')?.trim()
+                if (status != null && status != "0") throw IOException("WuxiaWorld could not complete the request (status $status). Try again later.")
                 continue
             }
+            if (flags.toInt() != 0) throw IOException("Unsupported WuxiaWorld response encoding")
             // Process the data frame
             ProtoReader(this, length.toLong()).callback()
         }

@@ -123,11 +123,13 @@ class SelectedNovelSources(private val request: suspend (String, Map<String, Str
     }
     suspend fun chapter(s: NovelSource, address: String): String {
         if(s.id == "fenrir") {
-            val nodes = JSONObject(request(address, null)).getJSONArray("nodes").objects().filter { it.optString("type") == "data" }
-            val data = nodes.getOrNull(1)?.optJSONArray("data") ?: throw IOException("FenrirRealm chapter unavailable")
-            return sanitize(data.optString(6).takeIf { it.contains('<') } ?: throw IOException("FenrirRealm chapter format changed"))
+            return fenrirChapter(request(address, null), address)
         }
-        val d = doc(address)
+        // WuxiaWorld's official lightweight reader serves the same accessible chapter
+        // without depending on a changing React layout. Keep original URLs in the library.
+        val chapterAddress = if (s.id == "wuxiaworld") address.toHttpUrl().newBuilder()
+            .host("lite.wuxiaworld.com").build().toString() else address
+        val d = doc(chapterAddress)
         if(s.id == "wattpad") {
             val script = d.select("script").firstOrNull { it.data().contains("window.prefetched") }?.data() ?: throw IOException("Wattpad requires access through its website for this chapter")
             val root = jsonObjectAfter(script, "window.prefetched")
@@ -139,10 +141,33 @@ class SelectedNovelSources(private val request: suspend (String, Map<String, Str
             for(page in 1..pages) html.append(request("$base$page", null))
             return sanitize(html.toString())
         }
-        val body = d.selectFirst(when(s.id) { "novelfire" -> "div#content"; "novelfull" -> "#chapter-content, #chr-content"; "wuxiaworld" -> "div.chapter-content"; "readhive" -> "main > div.prose"; else -> "div.chapter-content" }) ?: throw IOException("Chapter unavailable or locked on ${s.name}")
+        val body = d.selectFirst(when(s.id) { "novelfire" -> "div#content"; "novelfull" -> "#chapter-content, #chr-content"; "wuxiaworld" -> "#chapter-body, div.chapter-content"; "readhive" -> "main > div.prose"; else -> "div.chapter-content" }) ?: throw NovelAccessException(chapterAddress, "Chapter unavailable or locked on ${s.name}. Open the source to check access.")
         return sanitize(body.html())
     }
     companion object {
+        /** Svelte devalue stores references by index; their numeric positions change between chapters. */
+        internal fun fenrirChapter(raw: String, address: String): String {
+            val nodes = JSONObject(raw).getJSONArray("nodes")
+            for (i in 0 until nodes.length()) {
+                val node = nodes.optJSONObject(i) ?: continue
+                if (node.optString("type") != "data") continue
+                val data = node.optJSONArray("data") ?: continue
+                val root = data.optJSONObject(0) ?: continue
+                val chapter = data.optJSONObject(root.optInt("chapterData", -1)) ?: continue
+                val format = data.optString(chapter.optInt("content_format", -1))
+                val content = data.optString(chapter.optInt("content", -1))
+                if (format == "locked" || content.isBlank()) throw NovelAccessException(
+                    address.substringBefore("/__data.json"),
+                    "FenrirRealm has not provided this chapter's text. Open the source to check sign-in or chapter access, then return to retry.")
+                if (format != "html" && !content.contains('<')) {
+                    // Plain text must be escaped before being displayed as HTML.
+                    return sanitize(Jsoup.parse("").body().appendElement("p").text(content).outerHtml())
+                }
+                return sanitize(content)
+            }
+            throw IOException("FenrirRealm chapter data has changed. Open the source to check this chapter.")
+        }
+
         private const val READHIVE_CHAPTERS = "section.relative.grid.grid-cols-1.lg\\:grid-areas-series__body.lg\\:grid-cols-series.gap-x-4.px-4.py-2.sm\\:px-8 > div.lg\\:grid-in-content.mt-4 > div:nth-child(1) > div:nth-child(3) > div > div > a"
         fun sanitize(html: String): String {
             val d = Jsoup.parse(html); d.select("script, style, iframe, svg, noscript, [hidden], [aria-hidden=true]").remove()

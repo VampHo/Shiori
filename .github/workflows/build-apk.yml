@@ -43,11 +43,19 @@ jobs:
       - name: Install required Android packages
         run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
 
-      - name: Cache preview signing key
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: shiori-preview-signing-v1
+      - name: Restore persistent release signing key
+        id: signing
+        env:
+          SHIORI_KEYSTORE_BASE64: ${{ secrets.SHIORI_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$SHIORI_KEYSTORE_BASE64" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Release signing is not configured. Tests and an unsigned release will be checked, but no installable APK will be published."
+          else
+            umask 077
+            printf '%s' "$SHIORI_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/shiori-release.p12"
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Run unit tests and build debug APK
         run: bash gradlew --no-daemon --stacktrace :app:testDebugUnitTest :app:assembleDebug
@@ -78,14 +86,29 @@ jobs:
           path: ui-screenshots/*.png
           if-no-files-found: warn
 
-      - name: Build signed personal release
-        run: bash gradlew --no-daemon :app:assembleRelease
+      - name: Build release and verify signing
+        env:
+          SIGNING_READY: ${{ steps.signing.outputs.ready }}
+          SHIORI_KEYSTORE_PASSWORD: ${{ secrets.SHIORI_KEYSTORE_PASSWORD }}
+          SHIORI_KEY_ALIAS: ${{ vars.SHIORI_KEY_ALIAS }}
+        run: |
+          if [ "$SIGNING_READY" = "true" ]; then
+            export SHIORI_KEYSTORE_PATH="$RUNNER_TEMP/shiori-release.p12"
+          fi
+          bash gradlew --no-daemon :app:assembleRelease
+          if [ "$SIGNING_READY" = "true" ]; then
+            "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
+          else
+            echo "### Validation passed; APK delivery is blocked by missing release signing." >> "$GITHUB_STEP_SUMMARY"
+            echo "Set SHIORI_KEYSTORE_BASE64 to the persistent private keystore, then rerun. No temporary signing key or installable APK was published." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload Shiori APK
+        if: steps.signing.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: Shiori-final
-          path: app/build/outputs/apk/release/*.apk
+          name: Shiori-9.5.2
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -100,3 +123,7 @@ jobs:
             app/build/outputs/androidTest-results/
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Remove temporary private signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/shiori-release.p12"

@@ -40,6 +40,27 @@ class NovelReaderAndroidTest {
         InstrumentationRegistry.getInstrumentation().targetContext.getSharedPreferences("shiori_novels", 0).edit().clear().commit()
     }
 
+    @Test fun novelRequestsReuseInAppBrowserCookies() = runBlocking {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.runOnMainSync { NovelHttp.initialize(instrumentation.targetContext) }
+        val url = okhttp3.HttpUrl.Builder().scheme("https").host("shiori-cookie-test.invalid").build()
+        val cookie = okhttp3.Cookie.Builder().name("session_test").value("shared-session")
+            .hostOnlyDomain(url.host).path("/").build()
+        val jar = NovelHttp.client.cookieJar
+        try {
+            jar.saveFromResponse(url, listOf(cookie))
+            // CookieManager writes are asynchronous; allow only a bounded wait for propagation.
+            var found = false
+            repeat(20) {
+                if (jar.loadForRequest(url).any { it.name == "session_test" && it.value == "shared-session" }) found = true
+                if (!found) kotlinx.coroutines.delay(50)
+            }
+            assertTrue("Novel HTTP requests must share the browser cookie store", found)
+        } finally {
+            jar.saveFromResponse(url, listOf(cookie.newBuilder().expiresAt(0).build()))
+        }
+    }
+
     @Test fun novelNavigationIsVisibleAndFavoritesOpens() {
         ActivityScenario.launch(NovelsActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->

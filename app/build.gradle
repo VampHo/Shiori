@@ -21,8 +21,8 @@ android {
 		applicationId 'io.github.vampho.shiori'
 		minSdk = 23
 		targetSdk = 36
-		versionCode = 1041
-		versionName = '9.5.1'
+		versionCode = 1042
+		versionName = '9.5.2'
 		generatedDensities = []
 		testInstrumentationRunner 'org.koitharu.kotatsu.HiltTestRunner'
 		ksp {
@@ -39,14 +39,24 @@ android {
 		}
 		resValue 'string', 'tg_backup_bot_token', localProperties.getProperty('tg_backup_bot_token', '')
 	}
+    signingConfigs {
+        personal {
+            if (System.getenv('SHIORI_KEYSTORE_PATH')) {
+                storeFile file(System.getenv('SHIORI_KEYSTORE_PATH'))
+                storePassword System.getenv('SHIORI_KEYSTORE_PASSWORD') ?: 'android'
+                keyAlias System.getenv('SHIORI_KEY_ALIAS') ?: 'shiori'
+                keyPassword System.getenv('SHIORI_KEYSTORE_PASSWORD') ?: 'android'
+            }
+        }
+    }
 	buildTypes {
 		debug {
 			applicationIdSuffix = '.debug'
 		}
 		release {
-            // Preserve the installed preview identity and key for an in-place personal update.
+            // Keep the package identity. Release signing must come from the persistent private key.
             applicationIdSuffix = '.debug'
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.personal
             debuggable false
 			minifyEnabled false
 			shrinkResources false

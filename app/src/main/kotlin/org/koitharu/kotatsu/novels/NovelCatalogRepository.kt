@@ -24,7 +24,7 @@ class NovelCatalogRepository {
     private val royalRoad = RoyalRoadRepository()
     private val inori = InoriNovelSource { url, form -> request(url, form) }
     private val selected = SelectedNovelSources { url, form -> request(url, form) }
-    private val client = OkHttpClient.Builder().callTimeout(30, TimeUnit.SECONDS).build()
+    private val client by lazy { NovelHttp.client }
 
     suspend fun browse(source: NovelSource, page: Int, order: String, genre: String): List<NovelLink> = withContext(Dispatchers.IO) {
         if (source.id == "inori") return@withContext inori.browse(page, order, genre)
@@ -88,12 +88,15 @@ class NovelCatalogRepository {
     private suspend fun fetch(url: String, form: Map<String, String>? = null): Document = Jsoup.parse(request(url, form), url)
     private suspend fun request(url: String, form: Map<String, String>?): String {
         require(sourceFor(url) != null || isServiceUrl(url)) { "Unsupported source address" }
-        val request = Request.Builder().url(url).header("User-Agent", "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36")
+        val request = Request.Builder().url(url).header("User-Agent", NovelHttp.userAgent)
             .header("Referer", url.toHttpUrl().newBuilder().encodedPath("/").query(null).build().toString())
         if (form != null) request.post(FormBody.Builder().apply { form.forEach { (k,v) -> add(k,v) } }.build())
         return client.newCall(request.build()).await().use {
+            if (it.code == 401 || it.code == 403) throw NovelAccessException(url,
+                "${sourceFor(url)?.name ?: "This source"} requires verification or sign-in. Open the source here, complete any prompt, then return to retry.")
+            if (it.code == 429) throw IOException("This source is limiting requests. Wait a little before retrying.")
             if (!it.isSuccessful) throw IOException("Source returned HTTP ${it.code}. Try again later.")
-            if (sourceFor(it.request.url.toString()) == null && !isServiceUrl(it.request.url.toString())) throw IOException("Source redirected to an unsupported address")
+            if (sourceFor(it.request.url.toString()) == null && !isServiceUrl(it.request.url.toString())) throw IOException("Source redirected to ${it.request.url.host}, which is not a recognized source address. Open in browser to check the destination.")
             it.body?.string() ?: throw IOException("Empty source response")
         }
     }
@@ -120,8 +123,13 @@ class NovelCatalogRepository {
         }.getOrDefault(false)
         fun sourceFor(url: String): NovelSource? = runCatching {
             val parsed = url.toHttpUrl()
-            (sources + legacySources).firstOrNull { parsed.scheme == "https" && parsed.port == 443 && parsed.host == it.base.toHttpUrl().host }
+            (sources + legacySources).firstOrNull { parsed.scheme == "https" && parsed.port == 443 && matchesSourceHost(parsed.host, it) }
         }.getOrNull()
+        private fun matchesSourceHost(host: String, source: NovelSource): Boolean {
+            val base = source.base.toHttpUrl().host.removePrefix("www.")
+            return host == base || host == "www.$base" ||
+                (source.id == "wuxiaworld" && host == "lite.wuxiaworld.com")
+        }
         fun cover(element: Element): String {
             val image = element.selectFirst(".pic img, figure img, img") ?: return ""
             return imageUrl(image)
