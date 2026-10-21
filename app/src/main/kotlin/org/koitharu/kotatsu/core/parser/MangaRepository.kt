@@ -86,7 +86,7 @@ interface MangaRepository {
 
 		private fun createRepository(source: MangaSource): MangaRepository? = when (source) {
 			is MangaParserSource -> ParserMangaRepository(
-				parser = loaderContext.newParserInstance(source),
+				parser = if (source == MangaParserSource.HITOMILA) ShioriHitomiParser(loaderContext) else loaderContext.newParserInstance(source),
 				cache = contentCache,
 				mirrorSwitcher = mirrorSwitcher,
 			)

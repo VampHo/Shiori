@@ -47,7 +47,7 @@ class NovelReaderAndroidTest {
                 assertEquals(2, modes.tabCount)
                 assertEquals(1, modes.selectedTabPosition)
                 assertTrue(modes.isShown)
-                assertEquals(7, activity.findViewById<RecyclerView>(R.id.novel_grid).adapter!!.itemCount)
+                assertEquals(8, activity.findViewById<RecyclerView>(R.id.novel_grid).adapter!!.itemCount)
                 assertTrue(activity.findViewById<BottomNavigationView>(R.id.novel_nav).isShown)
             }
             screenshot("novels-explore.png")

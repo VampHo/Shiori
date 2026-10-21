@@ -402,7 +402,7 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
                 listMode=value=="List"; progress.edit { putBoolean("list_mode",listMode) }; showSearch()
             }
         })
-        viewBinding.novelContent.addView(readerOptions.actionRow("Novel sources", "7 sources · English", R.drawable.ic_language) {
+        viewBinding.novelContent.addView(readerOptions.actionRow("Novel sources", "${NovelCatalogRepository.sources.size} sources · English", R.drawable.ic_language) {
             selectedSource=null; libraryQuery=""; viewBinding.novelNav.selectedItemId=R.id.novel_explore
         })
     }

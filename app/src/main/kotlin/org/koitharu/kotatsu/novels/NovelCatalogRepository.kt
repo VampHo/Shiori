@@ -22,10 +22,12 @@ data class NovelSource(val id: String, val name: String, val base: String, val o
 
 class NovelCatalogRepository {
     private val royalRoad = RoyalRoadRepository()
+    private val inori = InoriNovelSource { url, form -> request(url, form) }
     private val selected = SelectedNovelSources { url, form -> request(url, form) }
     private val client = OkHttpClient.Builder().callTimeout(30, TimeUnit.SECONDS).build()
 
     suspend fun browse(source: NovelSource, page: Int, order: String, genre: String): List<NovelLink> = withContext(Dispatchers.IO) {
+        if (source.id == "inori") return@withContext inori.browse(page, order, genre)
         if (source.id == "royalroad") return@withContext royalRoad.browse(page, order, genre.lowercase().replace('-', '_'))
         if (source.id !in setOf("freewebnovel", "libread")) return@withContext selected.browse(source, page, order, genre)
         val path = if (genre.isBlank()) "sort/$order/$page" else "genre/$genre/$page"
@@ -33,6 +35,7 @@ class NovelCatalogRepository {
     }
 
     suspend fun search(source: NovelSource, query: String): List<NovelLink> = withContext(Dispatchers.IO) {
+        if (source.id == "inori") return@withContext inori.search(query)
         if (source.id == "royalroad") return@withContext royalRoad.search(query)
         if (source.id !in setOf("freewebnovel", "libread")) return@withContext selected.search(source, query)
         val doc = if (source.id == "libread") fetch("${source.base}/search", mapOf("searchkey" to query)) else {
@@ -43,6 +46,7 @@ class NovelCatalogRepository {
 
     suspend fun details(url: String): NovelDetails = withContext(Dispatchers.IO) {
         val source = sourceFor(url) ?: throw IOException("Unsupported novel source")
+        if (source.id == "inori") return@withContext inori.details(url)
         if (source.id == "royalroad") return@withContext royalRoad.details(url)
         if (source.id !in setOf("freewebnovel", "libread")) return@withContext selected.details(source, url)
         val doc = fetch(url)
@@ -68,6 +72,7 @@ class NovelCatalogRepository {
 
     suspend fun chapter(url: String): String = withContext(Dispatchers.IO) {
         val source = sourceFor(url) ?: throw IOException("Unsupported chapter address")
+        if (source.id == "inori") return@withContext inori.chapter(url)
         if (source.id == "royalroad") return@withContext royalRoad.chapter(url)
         if (source.id !in setOf("freewebnovel", "libread")) return@withContext selected.chapter(source, url)
         val doc = fetch(url)
@@ -100,6 +105,7 @@ class NovelCatalogRepository {
             NovelSource("royalroad", "Royal Road", RoyalRoadRepository.BASE, listOf("Latest updates" to "latest-updates", "Best rated" to "best-rated", "Rising stars" to "rising-stars", "New releases" to "new-releases", "Completed" to "complete"))
         )
         val sources: List<NovelSource> = listOf(
+            NovelSource("inori", "Inori", InoriNovelSource.BASE, listOf("Relevance" to "", "Title" to "data-t", "Year released" to "data-d", "Volumes" to "data-v")),
             NovelSource("novelfire", "NovelFire", "https://novelfire.net", listOf("Popular" to "sort-popular", "New" to "sort-new", "Updates" to "sort-latest-release")),
             legacySources.first { it.id == "royalroad" },
             NovelSource("wattpad", "Wattpad", "https://www.wattpad.com", listOf("Popular" to "hot")),
@@ -143,7 +149,7 @@ class NovelCatalogRepository {
         }
         fun detailCover(doc: Document): String {
             // Never use a page-wide img fallback: the first image is often the site logo.
-            for (selector in listOf(".cover-art-container img", "figure.cover img", "div.book img", ".m-desc .pic img", ".m-info .pic img", "main img.object-cover", ".novel-info img", ".book-cover img", "img.book", "#series-info img", "div.pic img")) {
+            for (selector in listOf("section.hero-section article > figure > img", ".cover-art-container img", "figure.cover img", "div.book img", ".m-desc .pic img", ".m-info .pic img", "main img.object-cover", ".novel-info img", ".book-cover img", "img.book", "#series-info img", "div.pic img")) {
                 doc.select(selector).forEach { val url = imageUrl(it); if (url.isNotBlank()) return url }
             }
             for (selector in listOf("meta[property=og:image]", "meta[name=twitter:image]", "meta[name=image]")) {

@@ -20,7 +20,7 @@ class NovelCatalogRepositoryTest {
         assertEquals("", NovelCatalogRepository.detailCover(Jsoup.parse("<header><img src='/site.png'></header>", "https://freewebnovel.com")))
     }
     @Test fun catalogueContainsExactlyRequestedSources() {
-        assertEquals(listOf("NovelFire", "Royal Road", "Wattpad", "FenrirRealm", "WuxiaWorld", "NovelFull", "ReadHive"), NovelCatalogRepository.sources.map { it.name })
+        assertEquals(listOf("Inori", "NovelFire", "Royal Road", "Wattpad", "FenrirRealm", "WuxiaWorld", "NovelFull", "ReadHive"), NovelCatalogRepository.sources.map { it.name })
         // Existing downloads from retired catalogue sources must remain readable.
         assertNotNull(NovelCatalogRepository.sourceFor("https://freewebnovel.com/novel/one"))
     }
