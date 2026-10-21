@@ -34,10 +34,10 @@ is configured in repository Actions secrets:
 
 Store the keystore privately and keep a separate backup. Never commit it.
 Without the secret, validation can succeed, but no installable APK is published.
-The run summary explicitly reports this delivery blocker. Release builds never
+The run summary explicitly reports this delivery blocker. After adding the secret,\nrerun only the **Sign validated APK** job to sign the retained unsigned artifact.\nThe unsigned build artifact cannot be installed. Release builds never
 fall back to a temporary debug signing key.
 
-The package remains `io.github.vampho.shiori.debug`. Earlier CI builds attempted
+The stable release uses `io.github.vampho.shiori`; previews remain\n`io.github.vampho.shiori.debug`. The stable release installs alongside previews\nwithout deleting their data. Existing libraries are not migrated automatically.\nEarlier CI builds attempted
 to cache a nonexistent key path, so their signatures changed between builds.
 A new persistent key cannot update an app signed with a lost old key. Do not
 uninstall an existing installation until its data has been backed up and a

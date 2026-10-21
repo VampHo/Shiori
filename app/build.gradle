@@ -54,9 +54,8 @@ android {
 			applicationIdSuffix = '.debug'
 		}
 		release {
-            // Keep the package identity. Release signing must come from the persistent private key.
-            applicationIdSuffix = '.debug'
-            signingConfig signingConfigs.personal
+            // Stable release installs beside previews whose temporary signing keys were lost.
+            signingConfig = System.getenv('SHIORI_KEYSTORE_PATH') ? signingConfigs.personal : null
             debuggable false
 			minifyEnabled false
 			shrinkResources false

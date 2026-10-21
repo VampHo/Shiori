@@ -43,20 +43,6 @@ jobs:
       - name: Install required Android packages
         run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
 
-      - name: Restore persistent release signing key
-        id: signing
-        env:
-          SHIORI_KEYSTORE_BASE64: ${{ secrets.SHIORI_KEYSTORE_BASE64 }}
-        run: |
-          if [ -z "$SHIORI_KEYSTORE_BASE64" ]; then
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Release signing is not configured. Tests and an unsigned release will be checked, but no installable APK will be published."
-          else
-            umask 077
-            printf '%s' "$SHIORI_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/shiori-release.p12"
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Run unit tests and build debug APK
         run: bash gradlew --no-daemon --stacktrace :app:testDebugUnitTest :app:assembleDebug
 
@@ -86,29 +72,14 @@ jobs:
           path: ui-screenshots/*.png
           if-no-files-found: warn
 
-      - name: Build release and verify signing
-        env:
-          SIGNING_READY: ${{ steps.signing.outputs.ready }}
-          SHIORI_KEYSTORE_PASSWORD: ${{ secrets.SHIORI_KEYSTORE_PASSWORD }}
-          SHIORI_KEY_ALIAS: ${{ vars.SHIORI_KEY_ALIAS }}
-        run: |
-          if [ "$SIGNING_READY" = "true" ]; then
-            export SHIORI_KEYSTORE_PATH="$RUNNER_TEMP/shiori-release.p12"
-          fi
-          bash gradlew --no-daemon :app:assembleRelease
-          if [ "$SIGNING_READY" = "true" ]; then
-            "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
-          else
-            echo "### Validation passed; APK delivery is blocked by missing release signing." >> "$GITHUB_STEP_SUMMARY"
-            echo "Set SHIORI_KEYSTORE_BASE64 to the persistent private keystore, then rerun. No temporary signing key or installable APK was published." >> "$GITHUB_STEP_SUMMARY"
-          fi
+      - name: Build unsigned release
+        run: bash gradlew --no-daemon :app:assembleRelease
 
-      - name: Upload Shiori APK
-        if: steps.signing.outputs.ready == 'true'
+      - name: Retain validated release for signing
         uses: actions/upload-artifact@v4
         with:
-          name: Shiori-9.5.2
-          path: app/build/outputs/apk/release/app-release.apk
+          name: Shiori-unsigned-build
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -123,6 +94,69 @@ jobs:
             app/build/outputs/androidTest-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  sign:
+    name: Sign validated APK
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check persistent signing configuration
+        id: signing
+        env:
+          SHIORI_KEYSTORE_BASE64: ${{ secrets.SHIORI_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$SHIORI_KEYSTORE_BASE64" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No installable APK published: add SHIORI_KEYSTORE_BASE64, then rerun only this signing job."
+            echo "### Tests and release compilation passed; APK signing needs setup." >> "$GITHUB_STEP_SUMMARY"
+            echo "Add the persistent SHIORI_KEYSTORE_BASE64 secret, then rerun the Sign validated APK job. The unsigned build artifact cannot be installed." >> "$GITHUB_STEP_SUMMARY"
+          else
+            umask 077
+            printf '%s' "$SHIORI_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/shiori-release.p12"
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Java 17
+        if: steps.signing.outputs.ready == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        if: steps.signing.outputs.ready == 'true'
+        uses: android-actions/setup-android@v3
+        with:
+          packages: build-tools;35.0.0
+          log-accepted-android-sdk-licenses: false
+
+      - name: Download validated unsigned APK
+        if: steps.signing.outputs.ready == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: Shiori-unsigned-build
+          path: unsigned
+
+      - name: Sign and verify release
+        if: steps.signing.outputs.ready == 'true'
+        env:
+          SHIORI_KEYSTORE_PASSWORD: ${{ secrets.SHIORI_KEYSTORE_PASSWORD }}
+          SHIORI_KEY_ALIAS: ${{ vars.SHIORI_KEY_ALIAS }}
+        run: |
+          export SHIORI_KEYSTORE_PASSWORD="${SHIORI_KEYSTORE_PASSWORD:-android}"
+          export SHIORI_KEY_ALIAS="${SHIORI_KEY_ALIAS:-shiori}"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks "$RUNNER_TEMP/shiori-release.p12" --ks-key-alias "$SHIORI_KEY_ALIAS" --ks-pass env:SHIORI_KEYSTORE_PASSWORD --key-pass env:SHIORI_KEYSTORE_PASSWORD --out Shiori-9.5.2.apk unsigned/app-release-unsigned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs Shiori-9.5.2.apk
+
+      - name: Upload installable Shiori APK
+        if: steps.signing.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Shiori-9.5.2
+          path: Shiori-9.5.2.apk
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Remove temporary private signing material
         if: always()
