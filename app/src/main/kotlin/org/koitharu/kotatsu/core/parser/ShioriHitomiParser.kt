@@ -31,7 +31,7 @@ import java.util.LinkedList
 import java.util.Locale
 import kotlin.math.min
 
-@OptIn(ExperimentalUnsignedTypes::class)
+@OptIn(ExperimentalUnsignedTypes::class, org.koitharu.kotatsu.parsers.InternalParsersApi::class)
 internal class ShioriHitomiParser(context: MangaLoaderContext) : AbstractMangaParser(context, MangaParserSource.HITOMILA) {
 	override val configKeyDomain = ConfigKey.Domain("hitomi.la")
 
@@ -781,3 +781,4 @@ internal class ShioriHitomiParser(context: MangaLoaderContext) : AbstractMangaPa
 			.replace("♀", "(female)")
 	}
 }
+
