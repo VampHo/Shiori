@@ -481,7 +481,7 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
         button(if (downloadJob?.isActive == true) "Download in progress…" else "Download chapters") { downloadChapters(book) }
         if (book.source != "local") button("Refresh chapter list") {
             load({ openNovel(book.url) }) {
-                novel = repository.details(book.url).let { fresh -> fresh.copy(cover = fresh.cover.ifBlank { book.cover }) }
+                novel = repository.details(book.url).let { fresh -> fresh.copy(cover = book.cover.takeIf(NovelCatalogRepository::validCover) ?: fresh.cover) }
                 shelf.remember(novel!!.link())
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { shelf.cacheDetails(novel!!) }
                 showChapters()

@@ -195,14 +195,14 @@ class NovelReaderAndroidTest {
         }
     }
 
-    @Test fun personalCatalogueExcludesAdultBrokenAndUnselectedSources() {
+    @Test fun catalogueFiltersOnlyLanguage() {
         val policy = org.koitharu.kotatsu.explore.data.PersonalSourcePolicy
         val all = org.koitharu.kotatsu.parsers.model.MangaParserSource.entries
-        val allowed = all.filter(policy::allows)
-        assertTrue(allowed.isNotEmpty())
-        assertTrue(allowed.all { it.name in policy.sourceNames && !it.isBroken && it.contentType != org.koitharu.kotatsu.parsers.model.ContentType.HENTAI })
-        assertTrue(all.filter { it.contentType == org.koitharu.kotatsu.parsers.model.ContentType.HENTAI }.none(policy::allows))
-        assertEquals(policy.sourceNames, all.filter { it.name in policy.sourceNames }.map { it.name }.toSet())
+        val english = all.filter { it.locale == "en" }
+        assertTrue(english.size > 8)
+        assertTrue(english.all(policy::allows))
+        assertTrue(all.filter { it.locale == "ru" || it.locale == "es" }.none(policy::allows))
+        assertTrue(all.filter { it.locale.isNullOrBlank() }.all(policy::allows))
     }
 
     private fun screenshot(name: String) {

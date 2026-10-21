@@ -1,4 +1,4 @@
-name: Build test APK
+name: Build Shiori APK
 
 on:
   workflow_dispatch:
@@ -21,7 +21,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -78,11 +78,14 @@ jobs:
           path: ui-screenshots/*.png
           if-no-files-found: warn
 
-      - name: Upload test APK
+      - name: Build signed personal release
+        run: bash gradlew --no-daemon :app:assembleRelease
+
+      - name: Upload Shiori APK
         uses: actions/upload-artifact@v4
         with:
-          name: Shiori-novels-preview
-          path: app/build/outputs/apk/debug/*.apk
+          name: Shiori-final
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
 

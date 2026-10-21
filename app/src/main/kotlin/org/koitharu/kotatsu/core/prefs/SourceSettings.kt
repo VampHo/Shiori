@@ -44,7 +44,7 @@ class SourceSettings(context: Context, source: MangaSource) : MangaSourceConfig 
 				?.takeIf { DomainValidator.isValidDomain(it) }
 				?: key.defaultValue
 
-			is ConfigKey.ShowSuspiciousContent -> false
+			is ConfigKey.ShowSuspiciousContent -> prefs.getBoolean(key.key, key.defaultValue)
 			is ConfigKey.SplitByTranslations -> prefs.getBoolean(key.key, key.defaultValue)
 			is ConfigKey.DisableUpdateChecking -> prefs.getBoolean(key.key, key.defaultValue)
 			is ConfigKey.InterceptCloudflare -> prefs.getBoolean(key.key, key.defaultValue)

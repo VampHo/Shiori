@@ -121,15 +121,16 @@ class NovelCatalogRepository {
             return imageUrl(image)
         }
         private fun imageUrl(image: Element): String {
+            // Match a3: use the actual image before optional picture format variants.
+            for (attr in listOf("data-src", "data-original", "src")) {
+                val value = image.absUrl(attr)
+                if (validCover(value)) return value
+            }
             val picture = image.closest("picture")?.selectFirst("source[srcset]")
             if (picture != null) {
                 val best = picture.attr("srcset").split(',').lastOrNull()?.trim()?.substringBefore(' ').orEmpty()
                 val url = resolveImage(image.baseUri(), best)
                 if (url.isNotBlank()) return url
-            }
-            for (attr in listOf("data-src", "data-original", "src")) {
-                val value = image.absUrl(attr)
-                if (validCover(value)) return value
             }
             val srcset = image.attr("srcset").split(',').lastOrNull()?.trim()?.substringBefore(' ').orEmpty()
             return resolveImage(image.baseUri(), srcset)

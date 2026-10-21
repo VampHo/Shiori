@@ -1,12 +1,9 @@
 package org.koitharu.kotatsu.explore.data
 
-import org.koitharu.kotatsu.parsers.model.ContentType
 import org.koitharu.kotatsu.parsers.model.MangaParserSource
 
-/** Small catalogue for this personal build. Upstream broken flags always take precedence. */
+/** Keep English and multilingual catalogues. No popularity or adult-content restriction. */
 object PersonalSourcePolicy {
-    val sourceNames = setOf("MANGADEX", "MANGAPLUSPARSER_EN", "WEEBCENTRAL", "ASURASCANS",
-        "FLAMECOMICS", "HIVECOMIC", "RIZZCOMIC", "GOURMETSCANS")
-    fun allows(source: MangaParserSource): Boolean = source.name in sourceNames &&
-        !source.isBroken && source.contentType != ContentType.HENTAI
+    fun allows(source: MangaParserSource): Boolean = source.locale.isNullOrBlank() ||
+        source.locale?.substringBefore('-')?.substringBefore('_').equals("en", ignoreCase = true)
 }

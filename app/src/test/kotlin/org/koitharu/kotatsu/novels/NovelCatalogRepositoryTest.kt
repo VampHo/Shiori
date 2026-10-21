@@ -5,6 +5,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class NovelCatalogRepositoryTest {
+    @Test fun coverPrefersA3ImageBeforePictureVariants() {
+        val doc = Jsoup.parse("""<div class="pic"><picture>
+            <source srcset="/alternative.avif 900w"><img data-src="/original.jpg" src="/loading.gif">
+            </picture></div>""", "https://novelfire.net")
+        assertEquals("https://novelfire.net/original.jpg", NovelCatalogRepository.cover(doc))
+        assertEquals("https://novelfire.net/original.jpg", NovelCatalogRepository.detailCover(doc))
+    }
+
     @Test fun detailCoverNeverUsesTheSiteLogo() {
         val doc = Jsoup.parse("""<header><img src="/logo.png"></header>
             <div class="pic"><picture><source srcset="/cover-small.jpg 200w, /cover-large.jpg 600w"><img src="/loading.gif"></picture></div>""", "https://freewebnovel.com")

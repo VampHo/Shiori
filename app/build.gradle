@@ -21,8 +21,8 @@ android {
 		applicationId 'io.github.vampho.shiori'
 		minSdk = 23
 		targetSdk = 36
-		versionCode = 1039
-		versionName = '9.5.0-a6'
+		versionCode = 1040
+		versionName = '9.5.0'
 		generatedDensities = []
 		testInstrumentationRunner 'org.koitharu.kotatsu.HiltTestRunner'
 		ksp {
@@ -44,8 +44,12 @@ android {
 			applicationIdSuffix = '.debug'
 		}
 		release {
-			minifyEnabled true
-			shrinkResources true
+            // Preserve the installed preview identity and key for an in-place personal update.
+            applicationIdSuffix = '.debug'
+            signingConfig signingConfigs.debug
+            debuggable false
+			minifyEnabled false
+			shrinkResources false
 			proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
 		}
 		nightly {
