@@ -14,7 +14,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.jsoup.Jsoup
 import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
 import org.koitharu.kotatsu.parsers.config.ConfigKey
 import org.koitharu.kotatsu.parsers.core.AbstractMangaParser
 import org.koitharu.kotatsu.parsers.model.*
@@ -189,7 +188,7 @@ internal class ShioriHitomiParser(context: MangaLoaderContext) : AbstractMangaPa
 
 		else -> {
 			if (offset == 0) {
-				cachedSearchIds = hitomiSearch(filter.query, order, filter.locale.getSiteLang()).toList()
+				cachedSearchIds = hitomiSearch(filter.query.orEmpty(), order, filter.locale.getSiteLang()).toList()
 			}
 			cachedSearchIds.drop(offset.coerceAtLeast(0)).take(25)
 		}
