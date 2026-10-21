@@ -66,6 +66,36 @@ class NovelReaderAndroidTest {
         }
     }
 
+    @Test fun novelLoaderDecodesSvgCovers() = runBlocking {
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val file=File(context.cacheDir,"cover-test.svg")
+        file.writeText("""<svg xmlns="http://www.w3.org/2000/svg" width="24" height="40"><rect width="24" height="40" fill="#8866aa"/></svg>""")
+        try {
+            val result=NovelImages.get(context).execute(coil3.request.ImageRequest.Builder(context).data(file).build())
+            assertTrue(result is coil3.request.SuccessResult)
+        } finally { file.delete() }
+    }
+
+    @Test fun settingsUseCompactRowsAndPersistReadingSwitch() {
+        ActivityScenario.launch(NovelsActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                activity.findViewById<BottomNavigationView>(R.id.novel_nav).selectedItemId = R.id.novel_settings
+                fun descendants(view: android.view.View): List<android.view.View> = listOf(view) +
+                    if (view is android.view.ViewGroup) (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList()
+                val views = descendants(activity.findViewById(R.id.novel_content))
+                val labels = views.filterIsInstance<android.widget.TextView>()
+                assertTrue(labels.any { it.text.toString() == "Reading theme" && it.textSize / activity.resources.displayMetrics.scaledDensity <= 17f })
+                assertFalse(labels.any { it.text.toString().contains("The morning light") })
+                val toggle = views.filterIsInstance<com.google.android.material.materialswitch.MaterialSwitch>().first { it.contentDescription == "Full-screen reading" }
+                toggle.performClick()
+                assertFalse(NovelReaderOptions(activity).fullscreen)
+                activity.findViewById<BottomNavigationView>(R.id.novel_nav).selectedItemId = R.id.novel_explore
+                activity.findViewById<BottomNavigationView>(R.id.novel_nav).selectedItemId = R.id.novel_settings
+                assertFalse(NovelReaderOptions(activity).fullscreen)
+            }
+        }
+    }
+
     @Test fun importsEpubInSpineOrderAndReadsOffline() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val file = File(context.cacheDir, "fixture.epub")

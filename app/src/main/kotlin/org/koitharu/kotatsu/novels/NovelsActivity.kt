@@ -393,11 +393,18 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
     private fun refreshCurrent() { if (novel != null) showChapters() else showSearch() }
 
     private fun showSettings() {
-        label("Novel settings", 24f)
+        viewBinding.novelContent.setPadding(0, dp(8), 0, dp(20))
+        label("Settings", 26f).setPadding(dp(20), dp(12), dp(20), dp(8))
         viewBinding.novelContent.addView(readerOptions.build { fontSize = progress.getFloat("font_size", 20f) })
-        label("Library", 18f)
-        button("Default layout · ${if (listMode) "List" else "Grid"}") { toggleLayout() }
-        label("Import EPUB or text books from Library. Long-press a cover to organize it. Downloads and imported books work offline.", 14f)
+        label("Library", 14f).setPadding(dp(20), dp(24), dp(20), dp(8))
+        viewBinding.novelContent.addView(readerOptions.actionRow("Book layout", if(listMode) "List" else "Grid", R.drawable.ic_grid) {
+            choice("Book layout",listOf("Grid","List"),if(listMode) "List" else "Grid") { value ->
+                listMode=value=="List"; progress.edit { putBoolean("list_mode",listMode) }; showSearch()
+            }
+        })
+        viewBinding.novelContent.addView(readerOptions.actionRow("Novel sources", "7 sources · English", R.drawable.ic_language) {
+            selectedSource=null; libraryQuery=""; viewBinding.novelNav.selectedItemId=R.id.novel_explore
+        })
     }
 
     private fun applyReaderAppearance() {
@@ -449,6 +456,7 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
                 val hint = selectedBook?.takeIf { it.url == url }
                 val book = cached ?: repository.details(url)
                 val cover = when {
+                    cached != null && !shelf.needsCoverRepair(cached.link()) && NovelCatalogRepository.validCover(cached.cover) -> cached.cover
                     hint != null && NovelCatalogRepository.validCover(hint.cover) -> hint.cover
                     else -> book.cover
                 }

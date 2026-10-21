@@ -12,7 +12,13 @@ object NovelImages {
     @Volatile private var instance: ImageLoader? = null
     fun get(context: Context): ImageLoader = instance ?: synchronized(this) {
         instance ?: ImageLoader.Builder(context.applicationContext)
-            .components { add(OkHttpNetworkFetcherFactory()) }
+            .components {
+                add(OkHttpNetworkFetcherFactory())
+                add(coil3.svg.SvgDecoder.Factory())
+                add(org.koitharu.kotatsu.core.image.AvifImageDecoder.Factory())
+                if (android.os.Build.VERSION.SDK_INT >= 28) add(coil3.gif.AnimatedImageDecoder.Factory())
+                else add(coil3.gif.GifDecoder.Factory())
+            }
             .diskCache { DiskCache.Builder().directory(File(context.cacheDir, "novel_covers").toOkioPath()).maxSizeBytes(64L * 1024 * 1024).build() }
             .build().also { instance = it }
     }

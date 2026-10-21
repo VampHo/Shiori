@@ -143,7 +143,7 @@ class NovelCatalogRepository {
         }
         fun detailCover(doc: Document): String {
             // Never use a page-wide img fallback: the first image is often the site logo.
-            for (selector in listOf(".cover-art-container img", "figure.cover img", "div.book img", ".m-desc .pic img", ".m-info .pic img", "main img.object-cover", ".novel-info img", "div.pic img")) {
+            for (selector in listOf(".cover-art-container img", "figure.cover img", "div.book img", ".m-desc .pic img", ".m-info .pic img", "main img.object-cover", ".novel-info img", ".book-cover img", "img.book", "#series-info img", "div.pic img")) {
                 doc.select(selector).forEach { val url = imageUrl(it); if (url.isNotBlank()) return url }
             }
             for (selector in listOf("meta[property=og:image]", "meta[name=twitter:image]", "meta[name=image]")) {
