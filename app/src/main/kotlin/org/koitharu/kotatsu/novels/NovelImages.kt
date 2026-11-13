@@ -13,7 +13,9 @@ object NovelImages {
     fun get(context: Context): ImageLoader = instance ?: synchronized(this) {
         instance ?: ImageLoader.Builder(context.applicationContext)
             .components {
-                add(OkHttpNetworkFetcherFactory())
+                add(OkHttpNetworkFetcherFactory(callFactory = { NovelHttp.client.newBuilder()
+                    .addInterceptor { chain -> chain.proceed(chain.request().newBuilder()
+                        .header("User-Agent", NovelHttp.userAgent).build()) }.build() }))
                 add(coil3.svg.SvgDecoder.Factory())
                 add(org.koitharu.kotatsu.core.image.AvifImageDecoder.Factory())
                 if (android.os.Build.VERSION.SDK_INT >= 28) add(coil3.gif.AnimatedImageDecoder.Factory())

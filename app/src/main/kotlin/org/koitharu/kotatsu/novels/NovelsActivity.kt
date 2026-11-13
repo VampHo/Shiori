@@ -47,7 +47,7 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
     private var libraryQuery = ""
     private var listMode = false
     private var catalogLoaded = false
-    private var downloadJob: Job? = null
+    private var downloadWatch: androidx.lifecycle.LiveData<List<androidx.work.WorkInfo>>? = null
     private var coverRepairJob: Job? = null
     private val coverRepairAttempted = mutableSetOf<String>()
     private var selectedBook: NovelLink? = null
@@ -179,6 +179,8 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
     }
 
     private fun clear(title: String) {
+        downloadWatch?.removeObservers(this)
+        downloadWatch = null
         supportActionBar?.title = title
         readingText = null
         chapterHeading = null
@@ -368,7 +370,7 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
                             genre = source.genres.first { it.first == name }.second; query = ""; browsePage = 1; browse()
                         }
                     }, (if (listMode) "Grid" else "List") to { toggleLayout() }))
-                    if (query.isBlank()) compactRow(listOf("‹ Previous" to { if (browsePage > 1) { browsePage--; browse() } }, "Page $browsePage" to {}, "Next ›" to { if (results.isNotEmpty()) { browsePage++; browse() } }))
+                    if (query.isBlank() && source.id != "wuxiaworld") compactRow(listOf("‹ Previous" to { if (browsePage > 1) { browsePage--; browse() } }, "Page $browsePage" to {}, "Next ›" to { if (results.isNotEmpty()) { browsePage++; browse() } }))
                     if (results.isEmpty()) empty(if (catalogLoaded) "No novels found" else "Browse ${source.name}", "Reload") { browse() } else grid(results)
                 }
             }
@@ -379,6 +381,7 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
 
     private fun browse() {
         val source = selectedSource ?: return
+        if (source.id == "wuxiaworld") browsePage = 1
         if (order.isBlank()) order = source.orders.first().second
         load({ browse() }) {
             novel = null; chapterIndex = -1
@@ -486,6 +489,17 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
         }
     }
 
+    private fun refreshChapters(book: NovelDetails) {
+        load({ refreshChapters(book) }) {
+            val fresh = repository.details(book.url)
+            val updated = fresh.copy(cover = fresh.cover.takeIf(NovelCatalogRepository::validCover) ?: book.cover)
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { shelf.cacheDetails(updated) }
+            shelf.remember(updated.link())
+            novel = updated
+            showChapters()
+        }
+    }
+
     private fun showChapters() {
         val book = novel ?: return
         clear(book.title)
@@ -497,14 +511,9 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
         label(book.title, 24f)
         label(listOf(book.author, if (book.source == "local") "Imported book" else NovelCatalogRepository.sourceFor(book.url)?.name.orEmpty()).filter { it.isNotBlank() }.joinToString(" · "), 14f)
         button(if (savedBooks("favorites").any { it.url == book.url }) "Library · ${shelf.status(book.url)}" else "Add to library") { bookActions(book.link()) }
-        button(if (downloadJob?.isActive == true) "Download in progress…" else "Download chapters") { downloadChapters(book) }
-        if (book.source != "local") button("Refresh chapter list") {
-            load({ openNovel(book.url) }) {
-                novel = repository.details(book.url).let { fresh -> fresh.copy(cover = book.cover.takeIf(NovelCatalogRepository::validCover) ?: fresh.cover) }
-                shelf.remember(novel!!.link())
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { shelf.cacheDetails(novel!!) }
-                showChapters()
-            }
+        if (book.source != "local") {
+            downloadButton(book)
+            button("Refresh chapter list") { refreshChapters(book) }
         }
         val lastUrl = progress.getString("chapter:${book.url}", null)
         val last = book.chapters.indexOfFirst { it.url == lastUrl }
@@ -518,19 +527,28 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
             setOnClickListener { maxLines = if (maxLines == 4) Int.MAX_VALUE else 4 }
         }
         label(getString(R.string.novels_chapter_count, book.chapters.size), 20f)
-        book.chapters.drop(page * 100).take(100).forEachIndexed { index, chapter ->
+        val size = 32
+        page = page.coerceIn(0, (book.chapters.lastIndex.coerceAtLeast(0)) / size)
+        val first = page * size
+        val visible = book.chapters.subList(first, minOf(first + size, book.chapters.size))
+        val rows = visible.mapIndexed { index, chapter ->
             val chapterRow = MaterialButton(this, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
-                text = (if (shelf.hasChapter(chapter.url)) "↓  " else "") + chapter.title
+                text = chapter.title
                 isAllCaps = false
                 gravity = Gravity.START or Gravity.CENTER_VERTICAL
                 minHeight = dp(52)
                 setPadding(dp(8), dp(12), dp(8), dp(12))
-                setOnClickListener { openChapter(page * 100 + index) }
+                setOnClickListener { openChapter(first + index) }
             }
             viewBinding.novelContent.addView(chapterRow, LinearLayout.LayoutParams(-1, -2))
+            chapterRow
+        }
+        lifecycleScope.launch {
+            val saved = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { visible.map { shelf.hasChapter(it.url) } }
+            rows.forEachIndexed { i, row -> if (row.parent != null && saved[i]) row.text = "↓  " + visible[i].title }
         }
         if (page > 0) button(getString(R.string.novels_previous_page)) { page--; showChapters() }
-        if ((page + 1) * 100 < book.chapters.size) button(getString(R.string.novels_next_page)) { page++; showChapters() }
+        if ((page + 1) * size < book.chapters.size) button(getString(R.string.novels_next_page)) { page++; showChapters() }
         if (book.source != "local") button(getString(R.string.novels_open_website)) { openWebsite(book.url) }
     }
 
@@ -576,7 +594,6 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
 
     private fun downloadChapters(book: NovelDetails) {
         if (book.source == "local") { android.widget.Toast.makeText(this, "This book is already available offline", android.widget.Toast.LENGTH_SHORT).show(); return }
-        if (downloadJob?.isActive == true) { android.widget.Toast.makeText(this, "A download is already running", android.widget.Toast.LENGTH_SHORT).show(); return }
         val lastUrl = progress.getString("chapter:${book.url}", null)
         val start = book.chapters.indexOfFirst { it.url == lastUrl }.coerceAtLeast(0)
         val choices = listOf("Next 10 chapters", "Next 50 chapters", "All chapters", "Custom range…")
@@ -611,33 +628,46 @@ class NovelsActivity : BaseActivity<ActivityNovelsBinding>() {
         dialog.show()
     }
 
-    private fun startDownload(book: NovelDetails, chapters: List<NovelLink>) {
-        if (chapters.isEmpty() || downloadJob?.isActive == true) return
-            val indicator = com.google.android.material.progressindicator.LinearProgressIndicator(this).apply { max = chapters.size }
-            val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle("Downloading chapters")
-                .setMessage("Keep this screen open. Completed chapters are retained if you cancel.")
-                .setView(indicator).setNegativeButton("Cancel") { _, _ -> downloadJob?.cancel() }.create()
-            dialog.setCanceledOnTouchOutside(false)
-            dialog.setOnCancelListener { downloadJob?.cancel() }
-            dialog.show()
-            downloadJob = lifecycleScope.launch {
-                try {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { shelf.cacheDetails(book) }
-                    for ((index, chapter) in chapters.withIndex()) {
-                        if (!shelf.hasChapter(chapter.url)) {
-                            val html = repository.chapter(chapter.url)
-                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { shelf.cacheChapter(chapter.url, html) }
-                            shelf.downloaded(book)
-                            kotlinx.coroutines.delay(1000)
-                        } else shelf.downloaded(book)
-                        indicator.progress = index + 1
-                        dialog.setMessage("${index + 1} of ${chapters.size} chapters ready. Completed chapters are retained if you cancel.")
-                    }
-                    android.widget.Toast.makeText(this@NovelsActivity, "Chapters saved for offline reading", android.widget.Toast.LENGTH_LONG).show()
-                } catch (e: CancellationException) { throw e }
-                catch (e: Exception) { android.widget.Toast.makeText(this@NovelsActivity, "Download stopped: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show() }
-                finally { dialog.dismiss(); if (!isFinishing && !isDestroyed && novel?.url == book.url && chapterIndex < 0) showChapters() }
+    private fun downloadButton(book: NovelDetails) {
+        val manager = androidx.work.WorkManager.getInstance(this)
+        val name = NovelDownloadWorker.name(book.url)
+        val action = MaterialButton(this).apply { text = "Download chapters"; isAllCaps = false }
+        viewBinding.novelContent.addView(action)
+        var active: androidx.work.WorkInfo? = null
+        var hadActive = false
+        action.setOnClickListener {
+            if (active == null) downloadChapters(book)
+            else com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("Cancel this download?").setMessage("Chapters already saved will stay in Downloads.")
+                .setNegativeButton("Keep downloading", null)
+                .setPositiveButton("Cancel download") { _, _ -> manager.cancelUniqueWork(name) }.show()
+        }
+        downloadWatch = manager.getWorkInfosForUniqueWorkLiveData(name).also { live ->
+            live.observe(this) { infos ->
+                active = infos.firstOrNull { !it.state.isFinished }
+                val work = active
+                action.text = when {
+                    work == null -> "Download chapters"
+                    work.state == androidx.work.WorkInfo.State.ENQUEUED -> "Download queued · Cancel"
+                    else -> "Downloading · " + work.progress.getInt("done", 0) + "/" + work.progress.getInt("total", 0) + " · Cancel"
+                }
+                if (work == null && hadActive) {
+                    hadActive = false
+                    val error = infos.firstOrNull { it.state == androidx.work.WorkInfo.State.FAILED }?.outputData?.getString("error")
+                    if (error != null) android.widget.Toast.makeText(this, error, android.widget.Toast.LENGTH_LONG).show()
+                    if (novel?.url == book.url && chapterIndex < 0) showChapters()
+                } else hadActive = work != null
             }
+        }
+    }
+
+    private fun startDownload(book: NovelDetails, chapters: List<NovelLink>) {
+        if (chapters.isEmpty()) return
+        val work = androidx.work.OneTimeWorkRequestBuilder<NovelDownloadWorker>()
+            .setInputData(androidx.work.workDataOf("book" to book.url, "first" to chapters.first().url, "last" to chapters.last().url))
+            .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
+            .build()
+        androidx.work.WorkManager.getInstance(this).enqueueUniqueWork(NovelDownloadWorker.name(book.url), androidx.work.ExistingWorkPolicy.KEEP, work)
     }
 
     private fun openWebsite(url: String) {

@@ -61,6 +61,28 @@ class NovelReaderAndroidTest {
         }
     }
 
+    @Test fun interruptedDownloadRetainsCompletedChaptersAndResumesMissingOnly() = runBlocking {
+        val shelf = NovelShelf(InstrumentationRegistry.getInstrumentation().targetContext)
+        val id = "https://www.royalroad.com/fiction/" + java.util.UUID.randomUUID()
+        val chapters = (1..3).map { NovelLink("Chapter $it", "$id/$it") }
+        val book = NovelDetails("Resume test", id, "", chapters)
+        shelf.cacheDetails(book)
+        try {
+            try {
+                NovelDownloadWorker.downloadMissing(shelf, book, chapters, {
+                    if (it == chapters[1].url) throw java.io.IOException("interrupted")
+                    "saved first"
+                }, {}, {})
+                org.junit.Assert.fail("Expected interruption")
+            } catch (_: java.io.IOException) {}
+            val fetched = mutableListOf<String>()
+            NovelDownloadWorker.downloadMissing(shelf, book, chapters, { fetched.add(it); "resumed" }, {}, {})
+            assertEquals(chapters.drop(1).map { it.url }, fetched)
+            assertEquals("saved first", shelf.cachedChapter(chapters[0].url))
+            assertTrue(chapters.all { shelf.hasChapter(it.url) })
+        } finally { shelf.removeDownload(book.link()) }
+    }
+
     @Test fun novelNavigationIsVisibleAndFavoritesOpens() {
         ActivityScenario.launch(NovelsActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
